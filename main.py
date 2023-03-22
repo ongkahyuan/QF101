@@ -3,7 +3,7 @@ import modules.get_data as getData
 import modules.model as model
 import modules.vis as vis
 
-data = getData.getData()
+data = getData.getData("d")
 
 res = []
 

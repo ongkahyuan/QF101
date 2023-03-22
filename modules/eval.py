@@ -1,5 +1,5 @@
-import get_data
-import model
+from modules import get_data
+# import model
 
 def eval():
     pass
