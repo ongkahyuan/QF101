@@ -2,9 +2,15 @@ import pandas as pd
 
 class GetData:
     def __init__(self, data: pd.DataFrame, startDate: str, endDate: str) -> None:
-        self.data = data[(data[" [QUOTE_DATE]"]>=startDate) & (data[" [EXPIRE_DATE]"]<= endDate)]
-        self.startDate = startDate
-        self.endDate = endDate
+
+        data[" [QUOTE_DATE]"] = pd.to_datetime(data[" [QUOTE_DATE]"]) #datetime conversion from pandas
+        data[" [EXPIRE_DATE]"] = pd.to_datetime(data[" [EXPIRE_DATE]"]) #added
+
+        start = pd.to_datetime(startDate)
+        end = pd.to_datetime(endDate)
+
+        self.data = data[(data[" [QUOTE_DATE]"]>= start) & (data[" [EXPIRE_DATE]"]<= end)] #datetime comparison
+
 
     def getModelParams(self, frames: pd.DataFrame):
         def genTau(row):
@@ -27,6 +33,12 @@ class GetData:
         return frames[col_list]
 
     def getSpecificCurrentPrice(self, expDate: str, quoteDate: str, strikePrice: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+        
+        
+        self.data[" [QUOTE_DATE]"] = pd.to_datetime(self.data[" [QUOTE_DATE]"]) #added
+        self.data[" [EXPIRE_DATE]"] = pd.to_datetime(self.data[" [EXPIRE_DATE]"]) #added
+
+
         current = self.data.loc[
             (self.data[" [QUOTE_DATE]"] == quoteDate) & 
             (self.data[" [EXPIRE_DATE]"] == expDate) & 
@@ -34,6 +46,7 @@ class GetData:
         current = self.getModelParams(current)
 
         others = self.data.loc[(self.data[" [QUOTE_DATE]"] == quoteDate)]
+
         others = others.drop(others[
             (others[" [QUOTE_DATE]"] == quoteDate) & 
             (others[" [EXPIRE_DATE]"] == expDate) & 
@@ -43,6 +56,9 @@ class GetData:
         return current, others
 
     def getAllCurrentPrice(self, quoteDate: str)-> pd.DataFrame:
+
+        self.data[" [QUOTE_DATE]"] = pd.to_datetime(self.data[" [QUOTE_DATE]"]) #added
+
         res = self.data.loc[(self.data[" [QUOTE_DATE]"] == quoteDate)]
         res = self.getModelParams(res)
         print(res)
@@ -52,7 +68,7 @@ if __name__ == "__main__":
     df = pd.read_csv("./trimmed.csv")
     # date = dt.datetime(2021, 2, 20)
     
-    gd = GetData(df, "2022-07-01", "2022-08-01")
+    gd = GetData(df, pd.to_datetime("2022-07-01"), pd.to_datetime("2022-08-01")) #added
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
-    print(gd.getSpecificCurrentPrice("2022-07-22", "2022-07-04", 70))
+    print(gd.getSpecificCurrentPrice(pd.to_datetime("2022-07-22"), pd.to_datetime("2022-07-04"), 70)) #added
