@@ -1,7 +1,7 @@
 # Binomial Tree Option Pricing (nested list with for loop)
 import math
 # T-t -> tau
-def model(S,K,r,q,tau,sigma,N=100):
+def model(S,K,tau,sigma,r=0.1,q=0.02,N=100):
    # 1. 
    deltaT=tau/N                           # delta T is the time step
    u=math.exp(sigma*math.sqrt(deltaT))    # u is the uptick (amount that stock goes up by in each time step)
