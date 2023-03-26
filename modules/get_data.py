@@ -18,11 +18,12 @@ class GetData:
                        " [C_ASK]": 'c_ask',
                        " [P_BID]": 'p_bid',
                        " [P_ASK]": 'p_ask', 
+                       " [EXPIRE_DATE]": 'expire_date'
                        }, axis=1, inplace=True)
         frames['tau'] = frames.apply(lambda row: genTau(row), axis= 1)
         frames['sigma'] = frames.apply(lambda row: genSigma(row), axis= 1)
 
-        col_list = ['S', 'K', 'tau', 'sigma', 'c_bid', 'c_ask', 'p_bid', 'p_ask']
+        col_list = ['S', 'K', 'tau', 'sigma', 'c_bid', 'c_ask', 'p_bid', 'p_ask', 'expire_date']
         return frames[col_list]
 
     def getSpecificCurrentPrice(self, expDate: str, quoteDate: str, strikePrice: float) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -52,6 +53,6 @@ if __name__ == "__main__":
     # date = dt.datetime(2021, 2, 20)
     
     gd = GetData(df, "2022-07-01", "2022-08-01")
-    gd.getAllCurrentPrice("2022-07-01")
+    # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
-    # gd.getSpecificCurrentPrice("2022-07-22", "2022-07-04", 70)
+    print(gd.getSpecificCurrentPrice("2022-07-22", "2022-07-04", 70))
