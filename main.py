@@ -9,6 +9,8 @@ df = pd.read_csv("./trimmed.csv")
 
 gd = getData.GetData(df, pd.to_datetime("2022-07-01"), pd.to_datetime("2022-08-01")) #changed string to date time format
 
+print(gd.data)
+
 # res = []
 
 # for contract in data:
