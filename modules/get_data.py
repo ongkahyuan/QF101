@@ -33,19 +33,18 @@ class GetData:
         return frames[col_list]
 
     def getSpecificCurrentPrice(self, expDate: str, quoteDate: str, strikePrice: float) -> tuple[pd.DataFrame, pd.DataFrame]:
-        
-        
-        self.data[" [QUOTE_DATE]"] = pd.to_datetime(self.data[" [QUOTE_DATE]"]) #added
-        self.data[" [EXPIRE_DATE]"] = pd.to_datetime(self.data[" [EXPIRE_DATE]"]) #added
 
+        exp = pd.to_datetime(expDate)
+        quote = pd.to_datetime(quoteDate)
 
         current = self.data.loc[
-            (self.data[" [QUOTE_DATE]"] == quoteDate) & 
-            (self.data[" [EXPIRE_DATE]"] == expDate) & 
+            (self.data[" [QUOTE_DATE]"] == quote) & 
+            (self.data[" [EXPIRE_DATE]"] == exp) & 
             (self.data[" [STRIKE]"] == strikePrice)]
         current = self.getModelParams(current)
 
         others = self.data.loc[(self.data[" [QUOTE_DATE]"] == quoteDate)]
+
 
         others = others.drop(others[
             (others[" [QUOTE_DATE]"] == quoteDate) & 
@@ -57,9 +56,9 @@ class GetData:
 
     def getAllCurrentPrice(self, quoteDate: str)-> pd.DataFrame:
 
-        self.data[" [QUOTE_DATE]"] = pd.to_datetime(self.data[" [QUOTE_DATE]"]) #added
+        quote = pd.to_datetime(quoteDate)
 
-        res = self.data.loc[(self.data[" [QUOTE_DATE]"] == quoteDate)]
+        res = self.data.loc[(self.data[" [QUOTE_DATE]"] == quote)]
         res = self.getModelParams(res)
         print(res)
         return res
