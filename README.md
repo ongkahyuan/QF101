@@ -14,6 +14,12 @@ output:
 
 ## model.py
 improve the model if possible
+S = underlying price
+K = strike price
+r = risk free rate
+q = dividend rate
+tau = time to expiry in years
+sigma = implied volatility 
 ```
 input: (S,K,r,q,tau,sigma,N=100)
 output: (call price, put price)
