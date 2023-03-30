@@ -17,18 +17,19 @@ class Eval:
         self.df = df
         self.dataGetter = getData.GetData(df, startDate, endDate)
 
-    def compareModeltoMarket(self):
+    def compareModeltoMarket(self, threshold=2):
         # everyday, I can hold at most 5 long positions and 5 short positions
-        day = self.startDate
-        maxDiff = 0
-        underpricing = [0,0]
+        currentDay = self.startDate
+        maxModelToMarketDifference = 0
+
+        # index 0 for calls, index 1 for puts
+        underpricing = [0,0] 
         overpricing = [0,0]
-        threshold = 2
         underpricingCounter = [0,0]
         overpricingCounter = [0,0]
         contracts = 0
-        while day < self.endDate:
-            options = self.dataGetter.getAllCurrentPrice(day)
+        while currentDay < self.endDate:
+            options = self.dataGetter.getAllCurrentPrice(currentDay)
             options['model_c'] = options.apply(lambda row: model.model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
             options['model_p'] = options.apply(lambda row: model.model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
             options['c_diff'] = abs(options.c_ask - options.model_c)
@@ -41,14 +42,15 @@ class Eval:
 
             contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
-            maxDiff = max(maxDiff, options.c_diff.max())
-            maxDiff = max(maxDiff, options.p_diff.max())
+            maxModelToMarketDifference = max(maxModelToMarketDifference, options.c_diff.max())
+            maxModelToMarketDifference = max(maxModelToMarketDifference, options.p_diff.max())
 
             underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
             underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
             overpricingCounter[0] += len(options[-options.c_ask+options.model_c > threshold])
             overpricingCounter[1] += len(options[-options.p_ask+options.model_p > threshold])
-            # todo: vectorise this so that parallel computation can happen
+            
+            # what's above vectorises what's commented below
             # for index, row in options.iterrows():
             #     euro_c, amer_c = model.model("call", row.S, row.K, row.tau, row.c_vega)
             #     euro_p, amer_p = model.model("put", row.S, row.K, row.tau, row.p_vega)
@@ -58,7 +60,7 @@ class Eval:
             #     overPricingCall, overPricingPut = max(amer_c - row.c_ask, 0), max(amer_p-row.p_ask, 0)
             #     overpricing[0] += overPricingCall 
             #     overpricing[1] += overPricingPut
-            #     maxDiff = max(maxDiff, abs(row.c_ask-amer_c), abs(amer_p-row.p_ask))
+            #     maxModelToMarketDifference = max(maxModelToMarketDifference, abs(row.c_ask-amer_c), abs(amer_p-row.p_ask))
                 
             #     if overPricingCall > threshold:
             #         overpricingCounter[0] += 1
@@ -69,7 +71,7 @@ class Eval:
             #     if underPricingPut > threshold:
             #         underpricingCounter[1] += 1
             #     contracts += 2
-            day += timedelta(days=1)
+            currentDay += timedelta(days=1)
 
         # just return the variance from market price??
         print("CALL OVERPRICED ", overpricingCounter[0])
@@ -77,8 +79,9 @@ class Eval:
         print("CALL UNDERPRICED", underpricingCounter[0])
         print("PUT UNDERPRICED", underpricingCounter[1])
         print("number of contracts processed: ", contracts)
-        print("max difference between model price and market price:", maxDiff)
+        print("max difference between model price and market price:", maxModelToMarketDifference)
         return "Overpricing per contract: ", sum(overpricing)/contracts, "Underpricing per contract: ", sum(underpricing)/contracts
+
 
     def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
         # first identify whether i will buy or sell the option
