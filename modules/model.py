@@ -46,7 +46,7 @@ def binomial_tree_option_pricing(S, K, r, q, tau, sigma, N=100):
 
     return (european_call_price, european_put_price, american_call_price,american_put_price)
 
-def model(optionType,S,K,tau,sigma,r=0.034,q=0.0057,N=100):
+def model(optionType,S,K,tau,sigma,r=0.034,q=0.017,N=100):
    if optionType != 'call' and optionType != 'put':
       return 'Invalid option type','Invalid option type'
    
@@ -55,13 +55,13 @@ def model(optionType,S,K,tau,sigma,r=0.034,q=0.0057,N=100):
    d=1/u                                
 
    # This handles 0 sigma or very small sigma  
-   if u-d < 0.0001:
+   if u-d < 0.0001 or (math.exp((r-q)*deltaT)-d)/(u-d) > 1:
       return (max(S-K, 0),max(S-K, 0)) if optionType == "call" else (max(K-S, 0),max(K-S, 0))
    
    p=(math.exp((r-q)*deltaT)-d)/(u-d)  
 
-   euro=[[0.0 for j in range(i+1)] for i in range(N+1)] 
-   amer=[[0.0 for j in range(i+1)] for i in range(N+1)] 
+   euro=[[0.0 for j in range(i+1)] for i in range(N+1)]
+   amer=[[0.0 for j in range(i+1)] for i in range(N+1)]
 
    for j in range(N+1):
       if optionType == 'call':
@@ -96,6 +96,6 @@ def model(optionType,S,K,tau,sigma,r=0.034,q=0.0057,N=100):
 
 if __name__=='__main__':
    S=50.0; K=50.0; tau=183/365 
-   sigma=0.4; r=0.1; q=0.01
+   sigma=50; r=0.1; q=0.01
    print('European Value: {0}, American Option Value: {1}'.format(
                 *model('call',S,K,tau,sigma)))
