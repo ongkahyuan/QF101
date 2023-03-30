@@ -6,6 +6,7 @@ import yfinance as yf
 from heapq import heappush, heappop
 from datetime import datetime, timedelta
 import model
+import numpy as np
 
 
 class Eval:
@@ -16,11 +17,8 @@ class Eval:
         self.df = df
         self.dataGetter = getData.GetData(df, startDate, endDate)
 
-    def markToMarket(self):
+    def compareModeltoMarket(self):
         # everyday, I can hold at most 5 long positions and 5 short positions
-        long = []
-        short = []
-
         day = self.startDate
         maxDiff = 0
         underpricing = [0,0]
@@ -31,28 +29,46 @@ class Eval:
         contracts = 0
         while day < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(day)
+            options['model_c'] = options.apply(lambda row: model.model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
+            options['model_p'] = options.apply(lambda row: model.model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
+            options['c_diff'] = abs(options.c_ask - options.model_c)
+            options['p_diff'] = abs(options.p_ask - options.model_p)
 
+            underpricing[0] += np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
+            underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
+            overpricing[0] += np.maximum(-options.c_ask + options.model_c, np.zeros(len(options))).sum()
+            overpricing[1] += np.maximum(-options.p_ask + options.model_p, np.zeros(len(options))).sum()
+
+            contracts += len(options) * 2
+            # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
+            maxDiff = max(maxDiff, options.c_diff.max())
+            maxDiff = max(maxDiff, options.p_diff.max())
+
+            underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
+            underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
+            overpricingCounter[0] += len(options[-options.c_ask+options.model_c > threshold])
+            overpricingCounter[1] += len(options[-options.p_ask+options.model_p > threshold])
             # todo: vectorise this so that parallel computation can happen
-            for index, row in options.iterrows():
-                euro_c, amer_c = model.model("call", row.S, row.K, row.tau, row.c_vega)
-                euro_p, amer_p = model.model("put", row.S, row.K, row.tau, row.p_vega)
-                underPricingCall, underPricingPut = max(row.c_ask-amer_c, 0), max(row.p_ask-amer_p, 0)
-                underpricing[0] += underPricingCall
-                underpricing[1] += underPricingPut
-                overPricingCall, overPricingPut = max(amer_c - row.c_ask, 0), max(amer_p-row.p_ask, 0)
-                overpricing[0] += overPricingCall 
-                overpricing[1] += overPricingPut
-                maxDiff = max(maxDiff, abs(row.c_ask-amer_c), abs(amer_p-row.p_ask))
+            # for index, row in options.iterrows():
+            #     euro_c, amer_c = model.model("call", row.S, row.K, row.tau, row.c_vega)
+            #     euro_p, amer_p = model.model("put", row.S, row.K, row.tau, row.p_vega)
+            #     underPricingCall, underPricingPut = max(row.c_ask-amer_c, 0), max(row.p_ask-amer_p, 0)
+            #     underpricing[0] += underPricingCall
+            #     underpricing[1] += underPricingPut
+            #     overPricingCall, overPricingPut = max(amer_c - row.c_ask, 0), max(amer_p-row.p_ask, 0)
+            #     overpricing[0] += overPricingCall 
+            #     overpricing[1] += overPricingPut
+            #     maxDiff = max(maxDiff, abs(row.c_ask-amer_c), abs(amer_p-row.p_ask))
                 
-                if overPricingCall > threshold:
-                    overpricingCounter[0] += 1
-                if overPricingPut > threshold:
-                    overpricingCounter[1] += 1
-                if underPricingCall > threshold:
-                    underpricingCounter[0] += 1
-                if underPricingPut > threshold:
-                    underpricingCounter[1] += 1
-                contracts += 2
+            #     if overPricingCall > threshold:
+            #         overpricingCounter[0] += 1
+            #     if overPricingPut > threshold:
+            #         overpricingCounter[1] += 1
+            #     if underPricingCall > threshold:
+            #         underpricingCounter[0] += 1
+            #     if underPricingPut > threshold:
+            #         underpricingCounter[1] += 1
+            #     contracts += 2
             day += timedelta(days=1)
 
         # just return the variance from market price??
@@ -76,7 +92,7 @@ if __name__ == "__main__":
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
 
-    print(evalObj.markToMarket())
+    print(evalObj.compareModeltoMarket())
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
