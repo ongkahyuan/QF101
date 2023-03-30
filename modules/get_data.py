@@ -8,9 +8,6 @@ class GetData:
         def genTau(row):
             return row[" [DTE]"]/365
 
-        def genSigma(row):
-            return (row[" [C_VEGA]"] + row[" [P_VEGA]"]) / 2
-
         # date conversion 
         data[" [QUOTE_DATE]"] = pd.to_datetime(
             data[" [QUOTE_DATE]"])  # datetime conversion from pandas
@@ -30,13 +27,23 @@ class GetData:
                 " [C_ASK]": 'c_ask',
                 " [P_BID]": 'p_bid',
                 " [P_ASK]": 'p_ask', 
+                " [C_VEGA]": 'c_vega',
+                " [P_VEGA]": 'p_vega',
                 " [EXPIRE_DATE]": 'expire_date',
                 " [QUOTE_DATE]": 'quote_date'
                 }, axis=1, inplace=True)
         
         # pre-compute tau and sigma
         data['tau'] = data.apply(lambda row: genTau(row), axis= 1)
-        data['sigma'] = data.apply(lambda row: genSigma(row), axis= 1)
+        data = data[data['tau'] > 0]
+
+        # convert columns to numeric
+        col_list = ['S', 'K', 'tau', 'c_bid', 'c_ask', 'p_bid', 'p_ask', 'c_vega', 'p_vega', 'expire_date']
+        for col in col_list[:-1]:
+            if data[col].dtype == str:
+                data[col] = data[col].str.strip()
+            # frames[col] = pd.to_numeric(frames[col], errors='coerce').copy(deep=True)
+            data[col] = pd.to_numeric(data[col], errors='coerce')
 
         # set values
         self.data = data
@@ -44,7 +51,7 @@ class GetData:
         self.endDate = endDate
 
     def getModelParams(self, frames: pd.DataFrame):
-        col_list = ['S', 'K', 'tau', 'sigma', 'c_bid', 'c_ask', 'p_bid', 'p_ask', 'expire_date']
+        col_list = ['S', 'K', 'tau', 'c_bid', 'c_ask', 'p_bid', 'p_ask', 'c_vega', 'p_vega', 'expire_date']
         return frames[col_list].copy(deep = True)
 
     def getSpecificCurrentPrice(self, expDate: str, quoteDate: str, strikePrice: float):
@@ -80,7 +87,6 @@ if __name__ == "__main__":
 
     gd = GetData(df, pd.to_datetime("2022-07-01"),
                  pd.to_datetime("2022-08-01"))  # added
-    # print(gd.getAllCurrentPrice("2022-07-01"))
+    print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
-    print(gd.getSpecificCurrentPrice(pd.to_datetime("2022-07-22"),
-          pd.to_datetime("2022-07-04"), 70))  # added
+    # print(gd.getSpecificCurrentPrice(pd.to_datetime("2022-07-22"),pd.to_datetime("2022-07-04"), 70))  # added

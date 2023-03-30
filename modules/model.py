@@ -46,28 +46,25 @@ def binomial_tree_option_pricing(S, K, r, q, tau, sigma, N=100):
 
     return (european_call_price, european_put_price, american_call_price,american_put_price)
 
-def model(type,S,K,r,q,tau,sigma,N=100):
-   if type != 'call' and type != 'put':
+def model(optionType,S,K,tau,sigma,r=0.034,q=0.0057,N=100):
+   if optionType != 'call' and optionType != 'put':
       return 'Invalid option type','Invalid option type'
-   # 1. 
-   deltaT=tau/N                           # delta T is the time step
-   u=math.exp(sigma*math.sqrt(deltaT))    # u is the uptick (amount that stock goes up by in each time step)
-   d=1/u                                  # d is the downtick 
-   p=(math.exp((r-q)*deltaT)-d)/(u-d)     # p is risk neutral probability thingy i think (used for expectation)
-   # 2.
-   # ec=[[0.0 for j in range(i+1)] for i in range(N+1)] # call options tree
-   # ac=[[0.0 for j in range(i+1)] for i in range(N+1)] # call options tree
-   # ep=[[0.0 for j in range(i+1)] for i in range(N+1)] # put options tree
-   # ap=[[0.0 for j in range(i+1)] for i in range(N+1)] # put options tree
+   
+   deltaT=tau/N
+   u=math.exp(sigma*math.sqrt(deltaT))    
+   d=1/u                                
+
+   # This handles 0 sigma or very small sigma  
+   if u-d < 0.0001:
+      return (max(S-K, 0),max(S-K, 0)) if optionType == "call" else (max(K-S, 0),max(K-S, 0))
+   
+   p=(math.exp((r-q)*deltaT)-d)/(u-d)  
+
    euro=[[0.0 for j in range(i+1)] for i in range(N+1)] 
    amer=[[0.0 for j in range(i+1)] for i in range(N+1)] 
-   # every row is one time step, and every column is the computation for the number of upticks 
-   # the maximum number of upticks at the Nth time step is N 
 
-   # at the Nth time step, there are N+1 possible prices: 
-   # ( uptick ** N ) (downtick ** (0)), ( uptick ** N-1 ) (downtick ** (1)) ... , ( uptick ** 0 ) (downtick ** (N))
    for j in range(N+1):
-      if type == 'call':
+      if optionType == 'call':
          euro[N][j]=max(0, S*(u**j)*(d**(N-j))-K)
          amer[N][j]=max(0, S*(u**j)*(d**(N-j))-K)
       else:
@@ -78,9 +75,7 @@ def model(type,S,K,r,q,tau,sigma,N=100):
    discount=math.exp(-r*deltaT)
    for i in range(N-1,0-1,-1):
       for j in range(i+1):
-         # back propagate ->
-         # payoff at t = discounted average (payoff of uptick and downtick) at t+1
-         if type == 'call':
+         if optionType == 'call':
             europeanOptFuturePayoff = discount*(p*euro[i+1][j+1]+(1-p)*euro[i+1][j])
             americanOptFuturePayoff = discount*(p*amer[i+1][j+1]+(1-p)*amer[i+1][j])
          else:
@@ -88,20 +83,19 @@ def model(type,S,K,r,q,tau,sigma,N=100):
             americanOptFuturePayoff = discount*(p*amer[i+1][j+1]+(1-p)*amer[i+1][j])
 
          currentStockPrice = S*(u**j)*(d**(i-j))
-         if type == 'call':
+         if optionType == 'call':
             euro[i][j] = europeanOptFuturePayoff
             amer[i][j] = max(americanOptFuturePayoff, max(currentStockPrice-K, 0))
          else:
             euro[i][j] = europeanOptFuturePayoff
             amer[i][j] = max(americanOptFuturePayoff, max(K-currentStockPrice, 0))
-   
    # 4.
    euro_value=euro[0][0]
    amer_value=amer[0][0]
-   return euro_value,amer_value
+   return euro_value, amer_value
 
 if __name__=='__main__':
    S=50.0; K=50.0; tau=183/365 
    sigma=0.4; r=0.1; q=0.01
    print('European Value: {0}, American Option Value: {1}'.format(
-                *model('call',S,K,r,q,tau,sigma)))
+                *model('call',S,K,tau,sigma)))
