@@ -1,11 +1,11 @@
 # import modules.get_data as getData
-import get_data as getData
+import modules.get_data as getData
 import pandas as pd
 # import model
 import yfinance as yf
 from heapq import heappush, heappop
 from datetime import datetime, timedelta
-import model
+import modules.model as model
 import numpy as np
 
 
@@ -27,6 +27,7 @@ class Eval:
         underpricingCounter = [0,0]
         overpricingCounter = [0,0]
         contracts = 0
+
         while currentDay < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
             options['model_c'] = options.apply(lambda row: model.model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
@@ -172,6 +173,7 @@ class Eval:
     def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
         # first identify whether i will buy or sell the option
         # then figure out minLoss, maxLoss, minProfit, maxProfit given the movement of the stockprice
+
         pass
 
 
