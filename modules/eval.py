@@ -73,11 +73,6 @@ class Eval:
         for every call option SOLD, i need to know what the HIGH is for the day -> HIGH - Strike price = loss
         for every put option SOLD, i also need to know what the LOW is for the day -> Strike price - LOW = loss
         (vice versa for options BOUGHT)
-
-        TODO: Close positions after setting fixed buy and sell size
-        --> need a getAskingPrice(stock, strike, tau)?
-        to buy back options SOLD: currentBalance -= getAskingPrice(stock, strike, tau)
-        to sell back options BOUGHT: currentBalance += getAskingPrice(stock, strike, tau)
         '''
 
         currentDay = self.startDate
@@ -94,17 +89,16 @@ class Eval:
         currentBalance = 0
         # index 0 for calls, index 1 for puts
         contracts = 0
-        while currentDay < self.endDate:
+        while currentDay <= self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
             
             if not len(options):
                 currentDay += timedelta(days=1)
                 continue
 
-            stockHigh = options.S.max()
-            stockLow = options.S.min()
+            stockPrice = options.S.max()
 
-            print(currentDay, stockHigh, stockLow , '\n')
+            print('Date:', currentDay, '\nStock Price:', stockPrice)
 
             options['model_c'] = options.apply(lambda row: model.model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
             options['model_p'] = options.apply(lambda row: model.model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
@@ -116,18 +110,18 @@ class Eval:
             options['c_underpriced'] = (options.model_c - options.c_ask)
             options['p_underpriced'] = (options.model_p - options.p_ask)
 
-
+            # give me top 5 that if the difference is greater than the spread
             top5overpricedCallOptions = options[options['c_overpriced'] > spread].sort_values('c_overpriced',ascending=False).head()
             top5overpricedPutOptions = options[options['p_overpriced'] > spread].sort_values('p_overpriced',ascending=False).head()
             top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values('c_underpriced',ascending=False).head()
             top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values('p_underpriced',ascending=False).head()
 
             # min profit assumes that we exercised the option at the worst possible time
-            top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(lambda row: max(stockHigh-row['K'],0), axis=1)
-            top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(lambda row: max(row['K']-stockLow,0), axis=1)
+            top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(lambda row: max(stockPrice-row['K'],0), axis=1)
+            top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(lambda row: max(row['K']-stockPrice,0), axis=1)
             # max_loss assumes that the buyer exercised the option at the best possible time
-            top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(lambda row: max(stockHigh-row['K'],0), axis=1)
-            top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(lambda row: max(row['K']-stockLow,0), axis=1)
+            top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(lambda row: max(stockPrice-row['K'],0), axis=1)
+            top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(lambda row: max(row['K']-stockPrice,0), axis=1)
 
             callsBought = pd.concat([callsBought, top5underpricedCallOptions]) 
             putsBought = pd.concat([putsBought, top5underpricedPutOptions]) 
@@ -141,10 +135,10 @@ class Eval:
             currentBalance += (top5overpricedPutOptions.c_bid - spread).sum()
             
             #check positions PnL update worst possible profit and highest possible loss
-            callsBought['min_profit'] = callsBought.apply(lambda row: min(row['min_profit'], stockHigh-row['K']), axis=1)
-            putsBought['min_profit'] = putsBought.apply(lambda row: min(row['min_profit'],row['K']-stockLow), axis=1)
-            callsSold['max_loss'] = callsSold.apply(lambda row: max(stockHigh-row['K'], row['max_loss'], 0), axis=1)
-            putsSold['max_loss'] = putsSold.apply(lambda row: max(row['K']-stockLow, row['max_loss'], 0), axis=1)
+            callsBought['min_profit'] = callsBought.apply(lambda row: min(row['min_profit'], stockPrice-row['K']), axis=1)
+            putsBought['min_profit'] = putsBought.apply(lambda row: min(row['min_profit'],row['K']-stockPrice), axis=1)
+            callsSold['max_loss'] = callsSold.apply(lambda row: max(stockPrice-row['K'], row['max_loss'], 0), axis=1)
+            putsSold['max_loss'] = putsSold.apply(lambda row: max(row['K']-stockPrice, row['max_loss'], 0), axis=1)
 
             # add max loss and min profit close expired positions
             currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
@@ -167,30 +161,9 @@ class Eval:
             callsBought = callsBought[callsBought.expire_date > currentDay]
             putsBought = putsBought[putsBought.expire_date > currentDay]
 
-            # callsBought['max_loss'] = pd.concat([callsBought.max_loss, stockHigh-callsBought.K], axis=1).max(axis=1)
-
-            print(currentBalance)
+            print('EOD Balance:' ,currentBalance, '\n')
             
             currentDay += timedelta(days=1)
-
-        currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
-        losses['total_call'] += callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
-        losses['max_call'] = max(losses['max_call'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
-        currentBalance -= putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
-        losses['total_put'] += putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
-        losses['max_put'] = max(losses['max_put'],putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
-
-        currentBalance += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
-        profit['total_call'] += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
-        profit['min_call'] = min(profit['min_call'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
-        currentBalance += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
-        profit['total_put'] += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
-        profit['min_put'] = min(profit['min_put'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
-            
-        callsSold = callsSold[callsSold.expire_date > currentDay]
-        putsSold = putsSold[putsSold.expire_date > currentDay]
-        callsBought = callsBought[callsBought.expire_date > currentDay]
-        putsBought = putsBought[putsBought.expire_date > currentDay]
 
         print("losses:", losses, '\nprofits: ',profit)
 
