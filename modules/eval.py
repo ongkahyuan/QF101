@@ -78,8 +78,8 @@ class Eval:
         '''
 
         currentDay = self.startDate
-        losses = {"max_call": 0,"max_put":0, "total_call":0, "total_put": 0}
-        profit = {"min_call": sys.maxsize,"min_put": sys.maxsize, "total_call":0, "total_put": 0}
+        losses = {"max_loss_per_call_sold": 0,"max_loss_per_put_sold":0, "total_call_losses":0, "total_put_losses": 0}
+        profit = {"min_profit_per_call_bought": sys.maxsize,"min_profit_per_put_bought": sys.maxsize, "total_call_profit":0, "total_put_profit": 0}
 
         columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
@@ -91,7 +91,7 @@ class Eval:
         currentBalance = 0
         dailyBalance = []
         # index 0 for calls, index 1 for puts
-        contracts = 0
+        tradeCounter = [0,0,0,0]
         while currentDay <= self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
             
@@ -147,17 +147,21 @@ class Eval:
 
             # add max loss and min profit close expired positions
             currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
-            losses['total_call'] += callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
-            losses['max_call'] = max(losses['max_call'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
+            tradeCounter[2] += len(callsSold[callsSold.expire_date <= currentDay])
+            losses['total_call_losses'] += callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['max_loss_per_call_sold'] = max(losses['max_loss_per_call_sold'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
             currentBalance -= putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
-            losses['total_put'] += putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
-            losses['max_put'] = max(losses['max_put'],putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
+            tradeCounter[3] += len(putsSold[putsSold.expire_date <= currentDay])
+            losses['total_put_losses'] += putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['max_loss_per_put_sold'] = max(losses['max_loss_per_put_sold'],putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
             currentBalance += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
-            profit['total_call'] += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
-            profit['min_call'] = min(profit['min_call'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
+            tradeCounter[0] += len(callsBought[callsBought.expire_date <= currentDay])
+            profit['total_call_profit'] += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['min_profit_per_call_bought'] = min(profit['min_profit_per_call_bought'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
             currentBalance += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
-            profit['total_put'] += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
-            profit['min_put'] = min(profit['min_put'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
+            tradeCounter[1] += len(putsBought[putsBought.expire_date <= currentDay])
+            profit['total_put_profit'] += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['min_profit_per_put_bought'] = min(profit['min_profit_per_put_bought'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
 
             # close positions by filtering out expired options
             callsSold = callsSold[callsSold.expire_date > currentDay]
@@ -172,36 +176,49 @@ class Eval:
                     # buy back options sold that are worse than fifth best 
                     currentBalance -= (callsSold[callsSold.c_overpriced < fifthBestCallOverpriced]['c_ask'] + spread).sum()
                     currentBalance -= (callsSold[callsSold.c_overpriced < fifthBestCallOverpriced]['max_loss']).sum()
+                    tradeCounter[2] += len(callsSold[callsSold.c_overpriced < fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced',ascending=False).head()
                 if len(putsSold) > 5:
                     fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best 
                     currentBalance -= (putsSold[putsSold.p_overpriced < fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     currentBalance -= (putsSold[putsSold.p_overpriced < fifthBestPutOverpriced]['max_loss']).sum()
+                    tradeCounter[3] += len(putsSold[putsSold.p_overpriced < fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced',ascending=False).head()
                 if len(callsBought) > 5:
                     fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best 
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit']).sum()
-                    profit['total_call'] += callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit'].sum()
-                    profit['min_call'] = min(profit['min_call'], callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit'].min())
+                    profit['total_call_profit'] += callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit'].sum()
+                    profit['min_profit_per_call_bought'] = min(profit['min_profit_per_call_bought'], callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit'].min())
+                    tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
                     callsBought = callsBought.sort_values('c_underpriced',ascending=False).head()
                 if len(putsBought) > 5:
                     fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     currentBalance += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit']).sum()
-                    profit['total_put'] += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit']).sum()
-                    profit['min_put'] = min(profit['min_put'], putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit'].min())
+                    profit['total_profit_profit'] += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit']).sum()
+                    profit['min_profit_per_put_bought'] = min(profit['min_profit_per_put_bought'], putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit'].min())
+                    tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
                     putsBought = putsBought.sort_values('p_underpriced',ascending=False).head()
 
             # print('EOD Balance:' ,currentBalance, '\n')
             dailyBalance.append(currentBalance)
             
             currentDay += timedelta(days=1)
-
-        print("losses:", losses, '\nprofits: ',profit)
+        
+        print("losses stats:")
+        for stat in losses:
+            print(stat, ': ', round(losses[stat],2))
+        print('profits stats:')
+        for stat in profit:
+            print(stat, ': ', round(profit[stat],2))
+        
+        trades = ['calls bought', 'puts bought', 'calls sold', 'puts sold']
+        for i in range(4):
+            print(trades[i], ": ", tradeCounter[i])
         return dailyBalance
 
     def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
@@ -218,7 +235,9 @@ if __name__ == "__main__":
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
 
     # print(evalObj.compareModeltoMarket())
+    print("Without Rebalancing")
     withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
+    print('\nWith Rebalancing\n')
     withRebalancing = evalObj.tradeUntilExpiry()
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
