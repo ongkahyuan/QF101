@@ -7,6 +7,7 @@ from heapq import heappush, heappop
 from datetime import datetime, timedelta
 import model as model
 import numpy as np
+import sys
 
 
 class Eval:
@@ -80,8 +81,8 @@ class Eval:
         '''
 
         currentDay = self.startDate
-        maxModelToMarketDifference = 0
-
+        losses = {"max_call": 0,"max_put":0, "total_call":0, "total_put": 0}
+        profit = {"min_call": sys.maxsize,"min_put": sys.maxsize, "total_call":0, "total_put": 0}
 
         columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
@@ -147,9 +148,18 @@ class Eval:
 
             # add max loss and min profit close expired positions
             currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['total_call'] += callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['max_call'] = max(losses['max_call'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
             currentBalance -= putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['total_put'] += putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
+            losses['max_put'] = max(losses['max_put'],putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
+
             currentBalance += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['total_call'] += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['min_call'] = min(profit['min_call'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
             currentBalance += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['total_put'] += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
+            profit['min_put'] = min(profit['min_put'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
 
             # close positions by filtering out expired options
             callsSold = callsSold[callsSold.expire_date > currentDay]
@@ -164,16 +174,25 @@ class Eval:
             currentDay += timedelta(days=1)
 
         currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
+        losses['total_call'] += callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
+        losses['max_call'] = max(losses['max_call'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
         currentBalance -= putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
+        losses['total_put'] += putsSold[putsSold.expire_date <= currentDay]['max_loss'].sum()
+        losses['max_put'] = max(losses['max_put'],putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
+
         currentBalance += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
+        profit['total_call'] += callsBought[callsBought.expire_date <= currentDay]['min_profit'].sum()
+        profit['min_call'] = min(profit['min_call'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
         currentBalance += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
+        profit['total_put'] += putsBought[putsBought.expire_date <= currentDay]['min_profit'].sum()
+        profit['min_put'] = min(profit['min_put'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
             
         callsSold = callsSold[callsSold.expire_date > currentDay]
         putsSold = putsSold[putsSold.expire_date > currentDay]
         callsBought = callsBought[callsBought.expire_date > currentDay]
         putsBought = putsBought[putsBought.expire_date > currentDay]
 
-        print(len(callsBought), len(putsBought), len(callsSold), len(putsSold))
+        print("losses:", losses, '\nprofits: ',profit)
 
     def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
         # first identify whether i will buy or sell the option
