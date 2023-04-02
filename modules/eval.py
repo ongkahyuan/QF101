@@ -99,15 +99,13 @@ class Eval:
             if len(options) > 0:
                 stockPrice = options.S.max()
                 # use more accurate data if available
-                if currentDay.strftime("%Y-%m-%d") in self.priceHistory:
-                    history = self.priceHistory.loc[currentDay.strftime("%Y-%m-%d")]
+                if currentDay in self.priceHistory:
+                    history = self.priceHistory.loc[currentDay]
                     stockHigh, stockLow = history.High, history.Low
                 else:
                     stockHigh, stockLow = stockPrice, stockPrice
-                
 
                 # print('Date:', currentDay, '\nStock Price:', stockPrice)
-
                 options['model_c'] = options.apply(lambda row: model.model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
                 options['model_p'] = options.apply(lambda row: model.model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
 
