@@ -1,6 +1,7 @@
 # import modules.get_data as getData
 import get_data as getData
 import pandas as pd
+from matplotlib import pyplot as plt
 # import model
 import yfinance as yf
 from heapq import heappush, heappop
@@ -13,6 +14,7 @@ import sys
 class Eval:
     def __init__(self, df, startDate: datetime, endDate: datetime):
         self.ticker = yf.Ticker('AAPL')
+        self.priceHistory = self.ticker.history(period='1d', start=startDate.strftime("%Y-%m-%d"), end=endDate.strftime("%Y-%m-%d"))
         self.startDate = startDate
         self.endDate = endDate
         self.df = df
@@ -96,6 +98,13 @@ class Eval:
             # if there are options available, I have to consider purchasing them
             if len(options) > 0:
                 stockPrice = options.S.max()
+                # use more accurate data if available
+                if currentDay.strftime("%Y-%m-%d") in self.priceHistory:
+                    history = self.priceHistory.loc[currentDay.strftime("%Y-%m-%d")]
+                    stockHigh, stockLow = history.High, history.Low
+                else:
+                    stockHigh, stockLow = stockPrice, stockPrice
+                
 
                 # print('Date:', currentDay, '\nStock Price:', stockPrice)
 
@@ -115,11 +124,11 @@ class Eval:
                 top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values('c_underpriced',ascending=False).head()
                 top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values('p_underpriced',ascending=False).head()
                 # min profit assumes that we exercised the option at the worst possible time
-                top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(lambda row: max(stockPrice-row['K'],0), axis=1)
-                top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(lambda row: max(row['K']-stockPrice,0), axis=1)
+                top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(lambda row: max(stockHigh-row['K'],0), axis=1)
+                top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(lambda row: max(row['K']-stockLow,0), axis=1)
                 # max_loss assumes that the buyer exercised the option at the best possible time
-                top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(lambda row: max(stockPrice-row['K'],0), axis=1)
-                top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(lambda row: max(row['K']-stockPrice,0), axis=1)
+                top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(lambda row: max(stockHigh-row['K'],0), axis=1)
+                top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(lambda row: max(row['K']-stockLow,0), axis=1)
 
                 callsBought = pd.concat([callsBought, top5underpricedCallOptions])
                 putsBought = pd.concat([putsBought, top5underpricedPutOptions])
@@ -133,10 +142,10 @@ class Eval:
                 currentBalance += (top5overpricedPutOptions.c_bid - spread).sum()
                 
                 #check positions PnL update worst possible profit and highest possible loss
-                callsBought['min_profit'] = callsBought.apply(lambda row: min(row['min_profit'], stockPrice-row['K']), axis=1)
-                putsBought['min_profit'] = putsBought.apply(lambda row: min(row['min_profit'],row['K']-stockPrice), axis=1)
-                callsSold['max_loss'] = callsSold.apply(lambda row: max(stockPrice-row['K'], row['max_loss'], 0), axis=1)
-                putsSold['max_loss'] = putsSold.apply(lambda row: max(row['K']-stockPrice, row['max_loss'], 0), axis=1)
+                callsBought['min_profit'] = callsBought.apply(lambda row: min(row['min_profit'], stockHigh-row['K']), axis=1)
+                putsBought['min_profit'] = putsBought.apply(lambda row: min(row['min_profit'],row['K']-stockLow), axis=1)
+                callsSold['max_loss'] = callsSold.apply(lambda row: max(stockHigh-row['K'], row['max_loss'], 0), axis=1)
+                putsSold['max_loss'] = putsSold.apply(lambda row: max(row['K']-stockLow, row['max_loss'], 0), axis=1)
 
             # add max loss and min profit close expired positions
             currentBalance -= callsSold[callsSold.expire_date <= currentDay]['max_loss'].sum()
@@ -182,7 +191,7 @@ class Eval:
                     callsBought = callsBought.sort_values('c_underpriced',ascending=False).head()
                 if len(putsBought) > 5:
                     fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
-                    # sell back options sold that are worse than fifth best 
+                    # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     currentBalance += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit']).sum()
                     profit['total_put'] += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['min_profit']).sum()
@@ -214,13 +223,12 @@ if __name__ == "__main__":
     withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
     withRebalancing = evalObj.tradeUntilExpiry()
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
-    from matplotlib import pyplot as plt
+    
     plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
     plt.plot(dates, withRebalancing, label="W Rebalancing")
     
     plt.legend()
     plt.show()
-
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
