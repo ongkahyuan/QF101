@@ -46,7 +46,7 @@ def binomial_tree_option_pricing(S, K, r, q, tau, sigma, N=100):
 
     return (european_call_price, european_put_price, american_call_price,american_put_price)
 
-def model(optionType,S,K,tau,sigma,r=0.034,q=0.017,N=100):
+def model(optionType,S,K,tau,sigma,r=-.1,q=0,N=100):
    if optionType != 'call' and optionType != 'put':
       return 'Invalid option type','Invalid option type'
    
