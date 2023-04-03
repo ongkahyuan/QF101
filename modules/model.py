@@ -127,33 +127,23 @@ class Model:
         endDate = quoteDate + dt.timedelta(days=numDays)
 
         filter = (quoteDate >= self.dividendHistory['DeclarationDate']) & (quoteDate <= self.dividendHistory['EffDate'])
-
         dates =  self.dividendHistory[filter]
-        print(dates)
+
         possible_dates = [(7,2), (8,5), (7,8), (6,11)]
         numberOfYears = math.ceil(tau)
-        testDate = quoteDate
+
+        cutoffDate = quoteDate
         result = []
         if len(dates):
-            testDate = dates.iloc[0].EffDate + dt.timedelta(days=10)
+            cutoffDate = dates.iloc[0].EffDate + dt.timedelta(days=10)
             result.append((dates.iloc[0].EffDate.date(), dates.iloc[0].CashAmount))
         for i in range(numberOfYears):
             baseYear = quoteDate.year
             for dd,mm in possible_dates:
                 candidate = dt.datetime(baseYear+i,mm,dd)
-                if candidate >= testDate and candidate < endDate:
+                if candidate >= cutoffDate and candidate < endDate:
                     result.append((candidate, self.estDivPrice(candidate)))
-        print(result)
-
-        # Check for actual dividend dates
-        # for _, dates in self.dividendHistory.iterrows():
-        #     # print(dates['EffDate'], dates['DeclarationDate'])
-        #     if quoteDate >= dates['DeclarationDate'] and quoteDate < dates['EffDate']:
-        #         print(dates["DeclarationDate"])
-        #         divDate, divPrice = dates["DeclarationDate"], dates["CashAmount"]
-
-        # if not divDate and not divPrice:
-        #     pass
+        return result
 
 
 if __name__ == '__main__':
