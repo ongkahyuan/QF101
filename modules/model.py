@@ -9,7 +9,8 @@ import datetime as dt
 class Model:
 
     def __init__(self):
-        self.dividendHistory = pd.read_csv('../Divinfo.csv', parse_dates=[''])
+        self.dividendHistory = pd.read_csv(
+            './DivInfo.csv', parse_dates=['EffDate', 'DeclarationDate'])
 
     def binomial_tree_option_pricing(self, S, K, r, q, tau, sigma, N=100):
         """
@@ -111,6 +112,30 @@ class Model:
         amer_value = amer[0][0]
         return euro_value, amer_value
 
+    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
+        if not self.checkIfDividend():
+            return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)
+        beforeBreak = quoteDate
+        return 0
+
+    def estDivPrice(self, date: dt.datetime) -> int:
+        year = date.year
+        return 0.015*year - 0.095
+
+    def checkIfDividend(self, tau: float, quoteDate: dt.datetime):
+        numDays = tau*365
+        endDate = quoteDate + dt.timedelta(days=numDays)
+
+        divDate = None
+        divPrice = None
+
+        # Check for actual dividend dates
+        for _, dates in self.dividendHistory.iterrows():
+            # print(dates['EffDate'], dates['DeclarationDate'])
+            if quoteDate >= dates['DeclarationDate'] and quoteDate < dates['EffDate']:
+                # print(dates["DeclarationDate"])
+                divDate, divPrice = dates["DeclarationDate"], dates["CashAmount"]
+
 
 if __name__ == '__main__':
     S = 50.0
@@ -119,5 +144,7 @@ if __name__ == '__main__':
     sigma = 50
     r = 0.1
     q = 0.01
+    mod = Model()
     print('European Value: {0}, American Option Value: {1}'.format(
-        *model('call', S, K, tau, sigma)))
+        *mod.model('call', S, K, tau, sigma)))
+    mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
