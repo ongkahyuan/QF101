@@ -113,8 +113,8 @@ class Model:
         amer_value = amer[0][0]
         return euro_value, amer_value
 
-    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=20):
-        dividedDates = self.checkIfDividend(tau,quoteDate)
+    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
+        dividedDates = self.checkIfDividend(tau, quoteDate)
 
         if not dividedDates:
             return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)
@@ -125,12 +125,13 @@ class Model:
             print(type(date), type(currentDate))
 
             trials.append(round((date-currentDate).days*N/(tau*365)))
-            currentDate = date
-        print(trials)
+
+        # To ensure last tree has no dividend correction
+        dividedDates.append((None, None))
+        currentDate = date
         trees = []
         current = 1
         for trial in trials:
-            print(current)
             layer = []
             for i in range(current):
                 layer.append(self.treeGenerator(trial))
@@ -138,20 +139,19 @@ class Model:
             current *= (trial+1)
 
         pp = pprint.PrettyPrinter(indent=4)
-        # print(len(trees))
+        # Initialise first node of first layer of first tree with initial stock price
         trees[0][0][0][0] = S
-        for i in range(len(trees)):
-            self.generateTail(1.1,0.9,trees, i, dividedDates[i][1])
+        for layerIndex in range(len(trees)):
+            self.generateHeadAndTail(
+                1.1, 0.9, trees, layerIndex, dividedDates[layerIndex][1])
         pp.pprint(trees)
 
-
-
         return 0
-    
+
     def treeGenerator(self, trials):
         return [[0.0 for j in range(i+1)] for i in range(trials+1)]
-    
-    def generateTail(self,u,d,trees, layerIndex, div):
+
+    def generateHeadAndTail(self, u, d, trees, layerIndex, div):
         layer = trees[layerIndex]
         for treeIndex, tree in enumerate(layer):
             print(trees[layerIndex][treeIndex])
@@ -159,36 +159,38 @@ class Model:
             for i in range(N):
                 nextSSP = tree[0][0]*u**i*d**(N-i)
                 trees[layerIndex][treeIndex][-1][i] = nextSSP
-                if layerIndex < len(trees):
-                    trees[layerIndex+1][treeIndex * len(tree) + i][0][0] = nextSSP - div
-                # print(f"Layer: {layerIndex}, ti: {treeIndex}, i: {i}, len: {len(tree)}, formula: {treeIndex * len(tree) + i}")
+                if layerIndex < len(trees)-1:
+                    trees[layerIndex+1][treeIndex *
+                                        len(tree) + i][0][0] = nextSSP - div
 
-
-         
+    def backPropOptionPrices(self, trees, layerIndex):
+        pass
 
     def estDivPrice(self, date: dt.datetime) -> int:
         year = int(str(date.year)[-2:])
-        return round(0.015*year - 0.095,3)
+        return round(0.015*year - 0.095, 3)
 
     def checkIfDividend(self, tau: float, quoteDate: dt.datetime):
         numDays = tau*365
         endDate = quoteDate + dt.timedelta(days=numDays)
 
-        filter = (quoteDate >= self.dividendHistory['DeclarationDate']) & (quoteDate <= self.dividendHistory['EffDate'])
-        dates =  self.dividendHistory[filter]
+        filter = (quoteDate >= self.dividendHistory['DeclarationDate']) & (
+            quoteDate <= self.dividendHistory['EffDate'])
+        dates = self.dividendHistory[filter]
 
-        possible_dates = [(7,2), (8,5), (7,8), (6,11)]
+        possible_dates = [(7, 2), (8, 5), (7, 8), (6, 11)]
         numberOfYears = math.ceil(tau)
 
         cutoffDate = quoteDate
         result = []
         if len(dates):
             cutoffDate = dates.iloc[0].EffDate + dt.timedelta(days=10)
-            result.append((dt.datetime.combine(dates.iloc[0].EffDate.date(), dt.datetime.min.time()), dates.iloc[0].CashAmount))
+            result.append((dt.datetime.combine(dates.iloc[0].EffDate.date(
+            ), dt.datetime.min.time()), dates.iloc[0].CashAmount))
         for i in range(numberOfYears):
             baseYear = quoteDate.year
-            for dd,mm in possible_dates:
-                candidate = dt.datetime(baseYear+i,mm,dd)
+            for dd, mm in possible_dates:
+                candidate = dt.datetime(baseYear+i, mm, dd)
                 if candidate >= cutoffDate and candidate < endDate:
                     result.append((candidate, self.estDivPrice(candidate)))
         return result
@@ -207,4 +209,5 @@ if __name__ == '__main__':
         *mod.model('call', S, K, tau, sigma)))
     mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
 
-    mod.modelv2('call',dt.datetime(year=2022, month=7, day=29), S,K, tau, sigma)
+    mod.modelv2('call', dt.datetime(
+        year=2022, month=7, day=29), S, K, tau, sigma)
