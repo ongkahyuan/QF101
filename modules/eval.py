@@ -367,20 +367,20 @@ class Eval:
                 currentBalance += (top5overpricedPutOptions.c_bid - spread).sum()
 
             # add compute pnl if signal to close position is hit
-            currentBalance -= callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*threshold)].apply(lambda row: stockHigh - row.K, axis=1).sum()
-            tradeCounter[2] += len(callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*threshold)])
+            currentBalance -= callsSold[(stockHigh - callsSold.K) >= (callsSold.c_bid*threshold)].apply(lambda row: stockHigh - row.K, axis=1).sum()
+            tradeCounter[2] += len(callsSold[(stockHigh - callsSold.K) >= (callsSold.c_bid*threshold)])
             callsSold = callsSold[(stockHigh - callsSold.K) < (callsSold.c_ask*threshold)]
 
-            currentBalance -= putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
-            tradeCounter[3] += len(putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*threshold)])
+            currentBalance -= putsSold[(putsSold.K - stockLow) >= (putsSold.p_bid*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[3] += len(putsSold[(putsSold.K - stockLow) >= (putsSold.p_bid*threshold)])
             putsSold = putsSold[(putsSold.K - stockLow) < (putsSold.p_ask*threshold)]
 
-            currentBalance += callsBought[(stockHigh - callsBought.K) >= (callsBought.c_bid*threshold)].apply(lambda row: stockHigh -  row.K , axis=1).sum()
-            tradeCounter[0] += len(callsBought[(stockHigh - callsBought.K) >= (callsBought.c_bid*threshold)])
+            currentBalance += callsBought[(stockHigh - callsBought.K) >= (callsBought.c_ask*threshold)].apply(lambda row: stockHigh -  row.K , axis=1).sum()
+            tradeCounter[0] += len(callsBought[(stockHigh - callsBought.K) >= (callsBought.c_ask*threshold)])
             callsBought = callsBought[(stockHigh - callsBought.K) < (callsBought.p_ask*threshold)]
  
-            currentBalance += putsBought[(putsBought.K - stockLow) >= (putsBought.p_bid*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
-            tradeCounter[1] += len(putsBought[(putsBought.K - stockLow) >= (putsBought.p_bid*threshold)])
+            currentBalance += putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[1] += len(putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*threshold)])
             putsBought = putsBought[(putsBought.K - stockLow) < (putsBought.p_ask*threshold)]
 
             # close positions by filtering out expired options
@@ -400,14 +400,12 @@ class Eval:
                         5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (callsSold[callsSold.c_overpriced <fifthBestCallOverpriced]['c_ask'] + spread).sum()
-                    # currentBalance -= callsSold[callsSold.c_overpriced <fifthBestCallOverpriced].apply(lambda row: max(row.K-stockLow, 0), axis=1)
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced <fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
                 if len(putsSold) > 5:
                     fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced <fifthBestPutOverpriced]['p_ask'] + spread).sum()
-                    # currentBalance -= putsSold[putsSold.p_overpriced <fifthBestPutOverpriced].apply(lambda row: max(row.K-stockLow, 0), axis=1)
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced <fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
                 if len(callsBought) > 5:
@@ -445,13 +443,13 @@ if __name__ == "__main__":
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
     # date = dt.datetime(2021, 2, 20)
 
-    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
-    plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
-    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
-    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
+    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    # plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
+    # plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
+    # plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    # plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
     # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
     # plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
@@ -463,16 +461,16 @@ if __name__ == "__main__":
     # # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
     # # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
-    plt.legend()
-    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    plt.xlabel('xlabel', fontsize=16)
-    plt.show()
+    # plt.legend()
+    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    # plt.xlabel('xlabel', fontsize=16)
+    # plt.show()
 
     # print(evalObj.compareModeltoMarket())
     print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.01)
+    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
     print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExercised(threshold=1.01)
+    withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
     plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
