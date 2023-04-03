@@ -115,6 +115,10 @@ class Model:
 
     def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
+        deltaT = tau/N
+        u = math.exp(sigma*math.sqrt(deltaT))
+        d = 1/u
+        p = (math.exp(r*deltaT)-d)/(u-d)
 
         if not dividedDates:
             return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)
@@ -122,8 +126,6 @@ class Model:
         trials = []
         currentDate = quoteDate
         for date, amount in dividedDates + [(quoteDate+dt.timedelta(tau*365), 0)]:
-            print(type(date), type(currentDate))
-
             trials.append(round((date-currentDate).days*N/(tau*365)))
 
         # To ensure last tree has no dividend correction
@@ -143,10 +145,73 @@ class Model:
         trees[0][0][0][0] = S
         for layerIndex in range(len(trees)):
             self.generateHeadAndTail(
-                1.1, 0.9, trees, layerIndex, dividedDates[layerIndex][1])
-        pp.pprint(trees)
+                u, d, trees, layerIndex, dividedDates[layerIndex][1])
 
-        return 0
+        # Calculate final option prices for last layer
+        for tree in trees[-1]:
+            for i in range(len(tree)):
+                node = tree[-1][i]
+                if optionType == 'call':
+                    tree[-1][i] = max(0, node-K)
+                else:
+                    tree[-1][i] = max(0, K-node)
+
+        # Backprop option payoff
+        discount = math.exp(-r*tau/N)
+        # print(f"len tree: {len(trees)}")
+        for layerInd in range(len(trees)-1, -1, -1):
+            # print(f"li: {layerInd}")
+            layer = trees[layerInd]
+            # self.backPropOptionPrices(optionType, tau/N, r, trees, ~i)
+            for treeInd in range(len(layer)-1, -1, -1):
+                tree = layer[treeInd]
+                # print(f"ti: {treeInd}")
+                # pp.pprint(tree)
+                baseStockPrice = tree[0][0]
+                for i in range(len(tree)-2, -1, -1):
+                    for j in range(i+1):
+                        currentStockPrice = baseStockPrice*(u**j)*(d**(i-j))
+                        if optionType == 'call':
+                            futurePayoff = discount * \
+                                (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
+                            payoff = max(futurePayoff, max(
+                                currentStockPrice-K, 0))
+                        else:
+                            futurePayoff = discount * \
+                                (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
+                            payoff = max(futurePayoff, max(
+                                K-currentStockPrice, 0))
+                        tree[i][j] = payoff
+                if layerInd != 0:
+                    # put the payoff in the previous layer
+                    prevLayer = trees[layerInd-1]
+                    pTreeLen = len(prevLayer[0])
+                    pTreeIndex = treeInd // pTreeLen
+                    pNodeIndex = treeInd % pTreeLen
+
+                    trees[layerInd-1][pTreeIndex][-1][pNodeIndex] = layer[treeInd][0][0]
+                    # print(
+                    #     f"pTI: {pTreeIndex}, cTI: {treeInd}, nTI: {pNodeIndex}")
+                    # print("PIND", pTreeIndex)
+        # pp.pprint(trees)
+        # print(trees[0][0][0])
+        # pp.pprint(trees[0][-1])
+        # pp.pprint(trees[1][0][0])
+        # pp.pprint(trees[1][1][0])
+        # pr = []
+        # pt = []
+
+        # for i, layer in enumerate(trees):
+        #     if i == 1:
+        #         for j, tree in enumerate(layer):
+        #             for k in range(len(tree)):
+        #                 pr.append(round(tree[-1][k]))
+        #     if i == 2:
+        #         for j, tree in enumerate(layer):
+        #             pt.append(round(tree[0][0]))
+        print(f"CHECK: {pr, pt}")
+
+        return trees[0][0][0][0]
 
     def treeGenerator(self, trials):
         return [[0.0 for j in range(i+1)] for i in range(trials+1)]
@@ -154,7 +219,7 @@ class Model:
     def generateHeadAndTail(self, u, d, trees, layerIndex, div):
         layer = trees[layerIndex]
         for treeIndex, tree in enumerate(layer):
-            print(trees[layerIndex][treeIndex])
+            # print(trees[layerIndex][treeIndex])
             N = len(tree[-1])
             for i in range(N):
                 nextSSP = tree[0][0]*u**i*d**(N-i)
@@ -163,8 +228,19 @@ class Model:
                     trees[layerIndex+1][treeIndex *
                                         len(tree) + i][0][0] = nextSSP - div
 
-    def backPropOptionPrices(self, trees, layerIndex):
-        pass
+    def backPropOptionPrices(self, optionType, deltaT, r, trees, layerIndex):
+        discount = math.exp(-r*deltaT)
+        layer = trees[layerIndex]
+        for treeIndex in range(len(layer)):
+            for nodeI in range(len(layer[treeIndex])):
+                for nodeJ in range(nodeI+1):
+                    payoff = 0
+                    if optionType == 'call':
+                        payoff = discount*p
+
+        if layerIndex != 0:
+            # set the prev layer tail option price
+            pass
 
     def estDivPrice(self, date: dt.datetime) -> int:
         year = int(str(date.year)[-2:])
@@ -201,13 +277,14 @@ if __name__ == '__main__':
     K = 50.0
     tau = 130/365
     # tau = 183/365
-    sigma = 50
+    sigma = 0.4
     r = 0.1
     q = 0.01
     mod = Model()
-    print('European Value: {0}, American Option Value: {1}'.format(
-        *mod.model('call', S, K, tau, sigma)))
-    mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
-
-    mod.modelv2('call', dt.datetime(
+    # print('European Value: {0}, American Option Value: {1}'.format(
+    # *mod.model('call', S, K, tau, sigma)))
+    # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
+    v1 = mod.model('call', S, K, tau, sigma)
+    v2 = mod.modelv2('call', dt.datetime(
         year=2022, month=7, day=29), S, K, tau, sigma)
+    print(v1, v2)
