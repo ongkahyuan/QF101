@@ -299,6 +299,133 @@ class Eval:
         for i in range(4):
             print(trades[i], ": ", tradeCounter[i])
         return dailyBalance
+    
+    def tradeUntilExercised(self, spread=0.2, rebalancing=True):
+        '''
+        exercised when S-K > optionprice + risk free rate
+        '''
+
+        currentDay = self.startDate
+        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
+        columns += ['underpriced', 'overpriced']
+        callsBought = pd.DataFrame(columns=columns)
+        putsBought = pd.DataFrame(columns=columns)
+        callsSold = pd.DataFrame(columns=columns)
+        putsSold = pd.DataFrame(columns=columns)
+        modelObj = model.Model()
+        currentBalance = 0
+        dailyBalance = []
+        # index 0 for calls, index 1 for puts
+        tradeCounter = [0, 0, 0, 0]
+        while currentDay <= self.endDate:
+            options = self.dataGetter.getAllCurrentPrice(currentDay)
+
+            # if there are options available, I have to consider purchasing them
+            if len(options) > 0:
+                stockPrice = options.S.max()
+                # use more accurate data if available
+                if currentDay in self.priceHistory:
+                    history = self.priceHistory.loc[currentDay]
+                    stockHigh, stockLow = history.High, history.Low
+                else:
+                    stockHigh, stockLow = stockPrice, stockPrice
+
+                # print('Date:', currentDay, '\nStock Price:', stockPrice)
+                options['model_c'] = options.apply(lambda row: modelObj.modelv2('call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+                options['model_p'] = options.apply(lambda row: modelObj.modelv2('put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
+
+                # overpriced: sell because people are willing to pay for higher price that what we think they are worth
+                options['c_overpriced'] = (options.c_bid - options.model_c)
+                options['p_overpriced'] = (options.p_bid - options.model_p)
+                # underpriced: buy because we think that people are selling for less than what we think they are worth
+                options['c_underpriced'] = (options.model_c - options.c_ask)
+                options['p_underpriced'] = (options.model_p - options.p_ask)
+
+                # give me top 5 that if the difference is greater than the spread
+                top5overpricedCallOptions = options[options['c_overpriced'] > spread].sort_values('c_overpriced', ascending=False).head()
+                top5overpricedPutOptions = options[options['p_overpriced'] > spread].sort_values('p_overpriced', ascending=False).head()
+                top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values('c_underpriced', ascending=False).head()
+                top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values('p_underpriced', ascending=False).head()
+                print(top5overpricedCallOptions)
+                callsBought = pd.concat([callsBought, top5underpricedCallOptions])
+                putsBought = pd.concat([putsBought, top5underpricedPutOptions])
+                callsSold = pd.concat([callsSold, top5overpricedCallOptions])
+                putsSold = pd.concat([putsSold, top5overpricedPutOptions])
+                print(callsBought)
+                print(callsSold)
+                # #update current balance after selling and buying options
+                currentBalance -= (top5underpricedCallOptions.c_ask +spread).sum()
+                currentBalance -= (top5underpricedPutOptions.p_ask +spread).sum()
+                currentBalance += (top5overpricedCallOptions.c_bid -spread).sum()
+                currentBalance += (top5overpricedPutOptions.c_bid -spread).sum()
+
+            # add compute pnl if signal to close position is hit
+            currentBalance -= callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*1.03)].apply(lambda row: stockHigh - row.K, axis=1).sum()
+            tradeCounter[2] += len(callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*1.03)])
+            callsSold = callsSold[(stockHigh - callsSold.K) < (callsSold.c_ask*1.03)]
+            print(callsBought)
+            print(callsSold)
+            currentBalance -= putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[3] += len(putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*1.03)])
+            putsSold = putsSold[(putsSold.K - stockLow) < (putsSold.p_ask*1.03)]
+
+            currentBalance += callsBought[(stockHigh - callsBought.K) >= (callsBought.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[0] += len(callsBought[callsBought.expire_date <= currentDay])
+            callsBought = callsBought[(stockHigh - callsBought.K) < (callsBought.p_ask*1.03)]
+
+            currentBalance += putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[1] += len(putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*1.03)])
+            putsBought = putsBought[putsBought[(putsBought.K - stockLow) < (putsBought.p_ask*1.03)]]
+
+            # close positions by filtering out expired options
+            tradeCounter[2] += len(callsSold[callsSold.expire_date <= currentDay])
+            callsSold = callsSold[callsSold.expire_date > currentDay]
+            tradeCounter[3] += len(putsSold[putsSold.expire_date <= currentDay])
+            putsSold = putsSold[putsSold.expire_date > currentDay]
+            tradeCounter[0] += len(callsBought[callsBought.expire_date <= currentDay])
+            callsBought = callsBought[callsBought.expire_date > currentDay]
+            tradeCounter[1] += len(putsBought[putsBought.expire_date <= currentDay])
+            putsBought = putsBought[putsBought.expire_date > currentDay]
+
+            if rebalancing:
+                # if i have more than 5 positions, remove the ones with the smallest spread
+                if len(callsSold) > 5:
+                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(
+                        5).iloc[-1]
+                    # buy back options sold that are worse than fifth best
+                    currentBalance -= (callsSold[callsSold.c_overpriced <fifthBestCallOverpriced]['c_ask'] + spread).sum()
+                    # currentBalance -= callsSold[callsSold.c_overpriced <fifthBestCallOverpriced].apply(lambda row: max(row.K-stockLow, 0), axis=1)
+                    tradeCounter[2] += len(callsSold[callsSold.c_overpriced <fifthBestCallOverpriced])
+                    callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
+                if len(putsSold) > 5:
+                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
+                    # buy back options sold that are worse than fifth best
+                    currentBalance -= (putsSold[putsSold.p_overpriced <fifthBestPutOverpriced]['p_ask'] + spread).sum()
+                    # currentBalance -= putsSold[putsSold.p_overpriced <fifthBestPutOverpriced].apply(lambda row: max(row.K-stockLow, 0), axis=1)
+                    tradeCounter[3] += len(putsSold[putsSold.p_overpriced <fifthBestPutOverpriced])
+                    putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
+                if len(callsBought) > 5:
+                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
+                    # sell back options sold that are worse than fifth best
+                    currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
+                    tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
+                    callsBought = callsBought.sort_values('c_underpriced', ascending=False).head()
+                if len(putsBought) > 5:
+                    fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
+                    # sell back options sold that are worse than fifth best
+                    currentBalance += (putsBought[putsBought.p_underpriced <fifthBestPutUnderpriced]['p_bid'] - spread).sum()
+                    tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
+                    putsBought = putsBought.sort_values('p_underpriced', ascending=False).head()
+
+            # print('EOD Balance:' ,currentBalance, '\n')
+            dailyBalance.append(currentBalance)
+
+            currentDay += timedelta(days=1)
+
+        trades = ['calls bought', 'puts bought', 'calls sold', 'puts sold']
+        for i in range(4):
+            print(trades[i], ": ", tradeCounter[i])
+        return dailyBalance
 
     def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
         # first identify whether i will buy or sell the option
@@ -324,9 +451,9 @@ if __name__ == "__main__":
 
     # print(evalObj.compareModeltoMarket())
     print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
+    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False)
     print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExpiry()
+    withRebalancing = evalObj.tradeUntilExercised()
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
     plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
