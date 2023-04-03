@@ -58,10 +58,10 @@ class Eval:
             underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
             overpricing[0] += np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
             overpricing[1] += np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
-            dailyunderpricingcall = np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
-            dailyunderpricingput = np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
-            dailyoverpricingcall = np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
-            dailyoverpricingput = np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
+            dailyunderpricingcall = np.maximum((options.c_ask - options.model_c)/options.c_ask, np.zeros(len(options))).sum()
+            dailyunderpricingput = np.maximum((options.p_ask - options.model_p)/options.p_ask, np.zeros(len(options))).sum()
+            dailyoverpricingcall = np.maximum((-options.c_bid + options.model_c)/options.c_bid, np.zeros(len(options))).sum()
+            dailyoverpricingput = np.maximum((-options.p_bid + options.model_p)/options.p_bid, np.zeros(len(options))).sum()
             dailyoverpricingc.append(dailyoverpricingcall/(len(options)))
             dailyoverpricingp.append(dailyoverpricingput/(len(options)))
             dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
@@ -450,10 +450,10 @@ if __name__ == "__main__":
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
-    plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
-    plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
-    plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
+    plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
+    plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
+    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
     # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     # overpricing,underpricing = evalObj.compareModeltoMarket()
     # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
@@ -461,6 +461,7 @@ if __name__ == "__main__":
     
     plt.legend()
     plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    plt.xlabel('xlabel', fontsize=16)
     plt.show()
 
     # print(evalObj.compareModeltoMarket())
