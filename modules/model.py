@@ -119,10 +119,10 @@ class Model:
         u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
-        # This handles 0 sigma or very small sigma
-        if u-d < 0.0001 or (math.exp((r*deltaT)-d)/(u-d))> 1:
-            return (max(S-K, 0)) if optionType == "call" else ( max(K-S, 0))
-        
+# This handles 0 sigma or very small sigma
+        if u-d < 0.0001 or (math.exp((r)*deltaT)-d)/(u-d) > 1:
+            return (max(S-K, 0)) if optionType == "call" else (max(K-S, 0))
+
         p = (math.exp(r*deltaT)-d)/(u-d)
 
         if not dividedDates:

@@ -34,15 +34,19 @@ class Eval:
         columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
         # modelmarketDf = pd.DataFrame(columns=columns)
-        dailyoverpricing = []
-        dailyunderpricing = []
+        dailyoverpricingc = []
+        dailyoverpricingp = []
+        dailyunderpricingc = []
+        dailyunderpricingp = []
 
 
         while currentDay < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
             if len(options)==0:
-                dailyoverpricing.append(0)
-                dailyunderpricing.append(0)
+                dailyoverpricingc.append(0)
+                dailyoverpricingp.append(0)
+                dailyunderpricingc.append(0)
+                dailyunderpricingp.append(0)
                 currentDay += timedelta(days=1)
                 continue
             options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
@@ -54,12 +58,16 @@ class Eval:
             underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
             overpricing[0] += np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
             overpricing[1] += np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
-            dailyoverpricing2= [np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum(),np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()]
-            dailyunderpricing2 = [np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum(),np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()]
-            dailyoverpricing.append(sum(dailyoverpricing2)/(len(options)*2))
-            dailyunderpricing.append(sum(dailyunderpricing2)/(len(options)*2))
+            dailyunderpricingcall = np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
+            dailyunderpricingput = np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
+            dailyoverpricingcall = np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
+            dailyoverpricingput = np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
+            dailyoverpricingc.append(dailyoverpricingcall/(len(options)))
+            dailyoverpricingp.append(dailyoverpricingput/(len(options)))
+            dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
+            dailyunderpricingp.append(dailyunderpricingput/(len(options)))
 
-            contracts += len(options) * 2
+            # contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
             maxModelToMarketDifference = max(
                 maxModelToMarketDifference, options.c_diff.max())
@@ -72,7 +80,7 @@ class Eval:
             overpricingCounter[1] += len(options[-options.p_bid+options.model_p > threshold])
             # modelmarketDf = pd.concat([modelmarketDf,options])
             currentDay += timedelta(days=1)
-            print(dailyoverpricing)
+            
 
         # just return the variance from market price??
         # print("CALL OVERPRICED ", overpricingCounter[0])
@@ -83,7 +91,7 @@ class Eval:
         # print("max difference between model price and market price:", maxModelToMarketDifference)
         # return "Overpricing per contract: ", sum(overpricing)/contracts, "Underpricing per contract: ", sum(underpricing)/contracts
         # return modelmarketDf
-        return dailyoverpricing,dailyunderpricing
+        return dailyoverpricingc, dailyoverpricingp, dailyunderpricingc, dailyunderpricingp
 
     def tradeUntilExpiry(self, spread=0.2, rebalancing=True):
         '''
@@ -440,27 +448,33 @@ if __name__ == "__main__":
     # date = dt.datetime(2021, 2, 20)
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
+    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
+    plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
+    plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
+    plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
     # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     # overpricing,underpricing = evalObj.compareModeltoMarket()
     # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
     # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
-    # plt.legend()
-    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    # plt.show()
+    plt.legend()
+    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    plt.show()
 
     # print(evalObj.compareModeltoMarket())
-    print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False)
-    print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExercised()
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    # print("Without Rebalancing")
+    # withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
+    # print('\nWith Rebalancing\n')
+    # withRebalancing = evalObj.tradeUntilExpiry()
+    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
-    plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
-    plt.plot(dates, withRebalancing, label="W Rebalancing")
+    # plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
+    # plt.plot(dates, withRebalancing, label="W Rebalancing")
     
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
