@@ -128,7 +128,7 @@ class Model:
         for date, amount in dividedDates + [(quoteDate+dt.timedelta(tau*365), 0)]:
             trials.append(round((date-currentDate).days*N/(tau*365)))
 
-        # To ensure last tree has no dividend correction
+        # To ensure the last tree has no dividend correction
         dividedDates.append((None, None))
         currentDate = date
         trees = []
