@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import datetime as dt
+import pprint
 # T-t -> tau
 
 
@@ -112,11 +113,58 @@ class Model:
         amer_value = amer[0][0]
         return euro_value, amer_value
 
-    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
-        if not self.checkIfDividend():
+    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=20):
+        dividedDates = self.checkIfDividend(tau,quoteDate)
+
+        if not dividedDates:
             return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)
-        beforeBreak = quoteDate
+
+        trials = []
+        currentDate = quoteDate
+        for date, amount in dividedDates + [(quoteDate+dt.timedelta(tau*365), 0)]:
+            print(type(date), type(currentDate))
+
+            trials.append(round((date-currentDate).days*N/(tau*365)))
+            currentDate = date
+        print(trials)
+        trees = []
+        current = 1
+        for trial in trials:
+            print(current)
+            layer = []
+            for i in range(current):
+                layer.append(self.treeGenerator(trial))
+            trees.append(layer)
+            current *= (trial+1)
+
+        pp = pprint.PrettyPrinter(indent=4)
+        # print(len(trees))
+        trees[0][0][0][0] = S
+        for i in range(len(trees)):
+            self.generateTail(1.1,0.9,trees, i, dividedDates[i][1])
+        pp.pprint(trees)
+
+
+
         return 0
+    
+    def treeGenerator(self, trials):
+        return [[0.0 for j in range(i+1)] for i in range(trials+1)]
+    
+    def generateTail(self,u,d,trees, layerIndex, div):
+        layer = trees[layerIndex]
+        for treeIndex, tree in enumerate(layer):
+            print(trees[layerIndex][treeIndex])
+            N = len(tree[-1])
+            for i in range(N):
+                nextSSP = tree[0][0]*u**i*d**(N-i)
+                trees[layerIndex][treeIndex][-1][i] = nextSSP
+                if layerIndex < len(trees):
+                    trees[layerIndex+1][treeIndex * len(tree) + i][0][0] = nextSSP - div
+                # print(f"Layer: {layerIndex}, ti: {treeIndex}, i: {i}, len: {len(tree)}, formula: {treeIndex * len(tree) + i}")
+
+
+         
 
     def estDivPrice(self, date: dt.datetime) -> int:
         year = int(str(date.year)[-2:])
@@ -136,7 +184,7 @@ class Model:
         result = []
         if len(dates):
             cutoffDate = dates.iloc[0].EffDate + dt.timedelta(days=10)
-            result.append((dates.iloc[0].EffDate.date(), dates.iloc[0].CashAmount))
+            result.append((dt.datetime.combine(dates.iloc[0].EffDate.date(), dt.datetime.min.time()), dates.iloc[0].CashAmount))
         for i in range(numberOfYears):
             baseYear = quoteDate.year
             for dd,mm in possible_dates:
@@ -149,7 +197,8 @@ class Model:
 if __name__ == '__main__':
     S = 50.0
     K = 50.0
-    tau = 183/365
+    tau = 130/365
+    # tau = 183/365
     sigma = 50
     r = 0.1
     q = 0.01
@@ -157,3 +206,5 @@ if __name__ == '__main__':
     print('European Value: {0}, American Option Value: {1}'.format(
         *mod.model('call', S, K, tau, sigma)))
     mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
+
+    mod.modelv2('call',dt.datetime(year=2022, month=7, day=29), S,K, tau, sigma)
