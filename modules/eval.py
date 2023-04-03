@@ -49,10 +49,8 @@ class Eval:
                 dailyunderpricingp.append(0)
                 currentDay += timedelta(days=1)
                 continue
-            options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'] ,row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-            options['model_p'] = options.apply(lambda row: model.Model().modelv2('put',row['quote_date'] ,row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-            print(options.c_ask)
-            print(options.model_c)
+            options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+            options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
             options['c_diff'] = abs(options.c_ask - options.model_c)
             options['p_diff'] = abs(options.p_ask - options.model_p)
 
@@ -121,7 +119,7 @@ class Eval:
         putsBought = pd.DataFrame(columns=columns)
         callsSold = pd.DataFrame(columns=columns)
         putsSold = pd.DataFrame(columns=columns)
-
+        modelObj = model.Model()
         currentBalance = 0
         dailyBalance = []
         # index 0 for calls, index 1 for puts
@@ -140,10 +138,10 @@ class Eval:
                     stockHigh, stockLow = stockPrice, stockPrice
 
                 # print('Date:', currentDay, '\nStock Price:', stockPrice)
-                options['model_c'] = options.apply(lambda row: model.model(
-                    'call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
-                options['model_p'] = options.apply(lambda row: model.model(
-                    'put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
+                options['model_c'] = options.apply(lambda row: model.Model().modelv2(
+                    'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+                options['model_p'] = options.apply(lambda row: model.Model().modelv2(
+                    'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
 
                 # overpriced: sell because people are willing to pay for higher price that what we think they are worth
                 options['c_overpriced'] = (options.c_bid - options.model_c)
@@ -329,6 +327,10 @@ if __name__ == "__main__":
     plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
     plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
+    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    # overpricing,underpricing = evalObj.compareModeltoMarket()
+    # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
+    # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
     plt.legend()
     plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
