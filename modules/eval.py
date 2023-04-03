@@ -40,7 +40,6 @@ class Eval:
 
         while currentDay < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
-<<<<<<< HEAD
             if len(options)==0:
                 dailyoverpricing.append(0)
                 dailyunderpricing.append(0)
@@ -59,23 +58,6 @@ class Eval:
             dailyunderpricing2 = [np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum(),np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()]
             dailyoverpricing.append(sum(dailyoverpricing2)/(len(options)*2))
             dailyunderpricing.append(sum(dailyunderpricing2)/(len(options)*2))
-=======
-            options['model_c'] = options.apply(lambda row: model.model(
-                'call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
-            options['model_p'] = options.apply(lambda row: model.model(
-                'put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
-            options['c_diff'] = abs(options.c_ask - options.model_c)
-            options['p_diff'] = abs(options.p_ask - options.model_p)
-
-            underpricing[0] += np.maximum(options.c_ask -
-                                          options.model_c, np.zeros(len(options))).sum()
-            underpricing[1] += np.maximum(options.p_ask -
-                                          options.model_p, np.zeros(len(options))).sum()
-            overpricing[0] += np.maximum(-options.c_bid +
-                                         options.model_c, np.zeros(len(options))).sum()
-            overpricing[1] += np.maximum(-options.p_bid +
-                                         options.model_p, np.zeros(len(options))).sum()
->>>>>>> origin/joel/model-improvements
 
             contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
@@ -84,27 +66,15 @@ class Eval:
             maxModelToMarketDifference = max(
                 maxModelToMarketDifference, options.p_diff.max())
 
-<<<<<<< HEAD
             underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
             underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
             overpricingCounter[0] += len(options[-options.c_bid+options.model_c > threshold])
             overpricingCounter[1] += len(options[-options.p_bid+options.model_p > threshold])
             # modelmarketDf = pd.concat([modelmarketDf,options])
-=======
-            underpricingCounter[0] += len(options[options.c_ask -
-                                          options.model_c > threshold])
-            underpricingCounter[1] += len(options[options.p_ask -
-                                          options.model_p > threshold])
-            overpricingCounter[0] += len(options[-options.c_bid +
-                                         options.model_c > threshold])
-            overpricingCounter[1] += len(options[-options.p_bid +
-                                         options.model_p > threshold])
->>>>>>> origin/joel/model-improvements
             currentDay += timedelta(days=1)
             print(dailyoverpricing)
 
         # just return the variance from market price??
-<<<<<<< HEAD
         # print("CALL OVERPRICED ", overpricingCounter[0])
         # print("PUT OVERPRICED", overpricingCounter[1])
         # print("CALL UNDERPRICED", underpricingCounter[0])
@@ -114,16 +84,6 @@ class Eval:
         # return "Overpricing per contract: ", sum(overpricing)/contracts, "Underpricing per contract: ", sum(underpricing)/contracts
         # return modelmarketDf
         return dailyoverpricing,dailyunderpricing
-=======
-        print("CALL OVERPRICED ", overpricingCounter[0])
-        print("PUT OVERPRICED", overpricingCounter[1])
-        print("CALL UNDERPRICED", underpricingCounter[0])
-        print("PUT UNDERPRICED", underpricingCounter[1])
-        print("number of contracts processed: ", contracts)
-        print("max difference between model price and market price:",
-              maxModelToMarketDifference)
-        return "Overpricing per contract: ", sum(overpricing)/contracts, "Underpricing per contract: ", sum(underpricing)/contracts
->>>>>>> origin/joel/model-improvements
 
     def tradeUntilExpiry(self, spread=0.2, rebalancing=True):
         '''
