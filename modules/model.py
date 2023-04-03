@@ -209,7 +209,7 @@ class Model:
         #     if i == 2:
         #         for j, tree in enumerate(layer):
         #             pt.append(round(tree[0][0]))
-        print(f"CHECK: {pr, pt}")
+        # print(f"CHECK: {pr, pt}")
 
         return trees[0][0][0][0]
 
