@@ -308,7 +308,7 @@ class Eval:
             print(trades[i], ": ", tradeCounter[i])
         return dailyBalance
     
-    def tradeUntilExercised(self, spread=0.2, rebalancing=True):
+    def tradeUntilExercised(self, spread=0.2, rebalancing=True, threshold=1.5):
         '''
         exercised when S-K > optionprice + risk free rate
         '''
@@ -354,36 +354,34 @@ class Eval:
                 top5overpricedPutOptions = options[options['p_overpriced'] > spread].sort_values('p_overpriced', ascending=False).head()
                 top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values('c_underpriced', ascending=False).head()
                 top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values('p_underpriced', ascending=False).head()
-                print(top5overpricedCallOptions)
+
                 callsBought = pd.concat([callsBought, top5underpricedCallOptions])
                 putsBought = pd.concat([putsBought, top5underpricedPutOptions])
                 callsSold = pd.concat([callsSold, top5overpricedCallOptions])
                 putsSold = pd.concat([putsSold, top5overpricedPutOptions])
-                print(callsBought)
-                print(callsSold)
+
                 # #update current balance after selling and buying options
-                currentBalance -= (top5underpricedCallOptions.c_ask +spread).sum()
-                currentBalance -= (top5underpricedPutOptions.p_ask +spread).sum()
-                currentBalance += (top5overpricedCallOptions.c_bid -spread).sum()
-                currentBalance += (top5overpricedPutOptions.c_bid -spread).sum()
+                currentBalance -= (top5underpricedCallOptions.c_ask + spread).sum()
+                currentBalance -= (top5underpricedPutOptions.p_ask + spread).sum()
+                currentBalance += (top5overpricedCallOptions.c_bid - spread).sum()
+                currentBalance += (top5overpricedPutOptions.c_bid - spread).sum()
 
             # add compute pnl if signal to close position is hit
-            currentBalance -= callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*1.03)].apply(lambda row: stockHigh - row.K, axis=1).sum()
-            tradeCounter[2] += len(callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*1.03)])
-            callsSold = callsSold[(stockHigh - callsSold.K) < (callsSold.c_ask*1.03)]
-            print(callsBought)
-            print(callsSold)
-            currentBalance -= putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
-            tradeCounter[3] += len(putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*1.03)])
-            putsSold = putsSold[(putsSold.K - stockLow) < (putsSold.p_ask*1.03)]
+            currentBalance -= callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*threshold)].apply(lambda row: stockHigh - row.K, axis=1).sum()
+            tradeCounter[2] += len(callsSold[(stockHigh - callsSold.K) >= (callsSold.c_ask*threshold)])
+            callsSold = callsSold[(stockHigh - callsSold.K) < (callsSold.c_ask*threshold)]
 
-            currentBalance += callsBought[(stockHigh - callsBought.K) >= (callsBought.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
-            tradeCounter[0] += len(callsBought[callsBought.expire_date <= currentDay])
-            callsBought = callsBought[(stockHigh - callsBought.K) < (callsBought.p_ask*1.03)]
+            currentBalance -= putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[3] += len(putsSold[(putsSold.K - stockLow) >= (putsSold.p_ask*threshold)])
+            putsSold = putsSold[(putsSold.K - stockLow) < (putsSold.p_ask*threshold)]
 
-            currentBalance += putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*1.03)].apply(lambda row: row.K - stockLow , axis=1).sum()
-            tradeCounter[1] += len(putsBought[(putsBought.K - stockLow) >= (putsBought.p_ask*1.03)])
-            putsBought = putsBought[putsBought[(putsBought.K - stockLow) < (putsBought.p_ask*1.03)]]
+            currentBalance += callsBought[(stockHigh - callsBought.K) >= (callsBought.c_bid*threshold)].apply(lambda row: stockHigh -  row.K , axis=1).sum()
+            tradeCounter[0] += len(callsBought[(stockHigh - callsBought.K) >= (callsBought.c_bid*threshold)])
+            callsBought = callsBought[(stockHigh - callsBought.K) < (callsBought.p_ask*threshold)]
+ 
+            currentBalance += putsBought[(putsBought.K - stockLow) >= (putsBought.p_bid*threshold)].apply(lambda row: row.K - stockLow , axis=1).sum()
+            tradeCounter[1] += len(putsBought[(putsBought.K - stockLow) >= (putsBought.p_bid*threshold)])
+            putsBought = putsBought[(putsBought.K - stockLow) < (putsBought.p_ask*threshold)]
 
             # close positions by filtering out expired options
             tradeCounter[2] += len(callsSold[callsSold.expire_date <= currentDay])
@@ -448,33 +446,33 @@ if __name__ == "__main__":
     # date = dt.datetime(2021, 2, 20)
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
-    plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
-    plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
-    plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
     # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # overpricing,underpricing = evalObj.compareModeltoMarket()
-    # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
-    # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
-    
-    plt.legend()
-    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    plt.show()
-
-    # print(evalObj.compareModeltoMarket())
-    # print("Without Rebalancing")
-    # withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
-    # print('\nWith Rebalancing\n')
-    # withRebalancing = evalObj.tradeUntilExpiry()
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
-    
-    # plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
-    # plt.plot(dates, withRebalancing, label="W Rebalancing")
+    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    # plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
+    # plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
+    # plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
+    # plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
+    # # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    # # overpricing,underpricing = evalObj.compareModeltoMarket()
+    # # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
+    # # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
     # plt.legend()
+    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
     # plt.show()
+
+    # print(evalObj.compareModeltoMarket())
+    print("Without Rebalancing")
+    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.01)
+    print('\nWith Rebalancing\n')
+    withRebalancing = evalObj.tradeUntilExercised(threshold=1.01)
+    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    
+    plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
+    plt.plot(dates, withRebalancing, label="W Rebalancing")
+    
+    plt.legend()
+    plt.show()
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
