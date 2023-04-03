@@ -312,29 +312,12 @@ if __name__ == "__main__":
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
     # date = dt.datetime(2021, 2, 20)
 
-<<<<<<< HEAD
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     overpricing,underpricing = evalObj.compareModeltoMarket()
     plt.plot(dates, overpricing, label="Daily Overpricing per contract")
     plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
-=======
-    # evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
-    evalObj = Eval(df, datetime(2022, 6, 1), datetime(2022, 9, 1))
-
-    # print(evalObj.compareModeltoMarket())
-    print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExpiry(rebalancing=False)
-    print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExpiry()
-    dates = [evalObj.startDate + timedelta(days=i)
-             for i in range((evalObj.endDate-evalObj.startDate).days+1)]
-
-    plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
-    plt.plot(dates, withRebalancing, label="W Rebalancing")
-
->>>>>>> origin/joel/model-improvements
     plt.legend()
     plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
     plt.show()
