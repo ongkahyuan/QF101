@@ -72,7 +72,7 @@ class Eval:
             dailyoverpricingp.append(dailyoverpricingput/(len(options)))
             dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
             dailyunderpricingp.append(dailyunderpricingput/(len(options)))
-            print(options[['c_vega']].drop_duplicates())
+
             # contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
             maxModelToMarketDifference = max(
@@ -476,9 +476,7 @@ if __name__ == "__main__":
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = evalObj.compareModeltoMarket()
-    print(overpricingc)
-    print(overpricingp)
+    overpricingc,overpricingp, underpricingc, underpricingp,overpricingctau,overpricingptau, underpricingctau, underpricingptau, = evalObj.compareModeltoMarket()
     plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
