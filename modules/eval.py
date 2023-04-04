@@ -403,19 +403,19 @@ class Eval:
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced <fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
                 if len(putsSold) > 5:
-                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
+                    fifthBestPutOverpriced = putsSold.p_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced <fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced <fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
                 if len(callsBought) > 5:
-                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
+                    fifthBestCallUnderpriced = callsBought.c_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
                     callsBought = callsBought.sort_values('c_underpriced', ascending=False).head()
                 if len(putsBought) > 5:
-                    fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
+                    fifthBestPutUnderpriced = putsBought.p_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced <fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
@@ -443,28 +443,19 @@ if __name__ == "__main__":
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
     # date = dt.datetime(2021, 2, 20)
 
-    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    # plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
-    # plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
-    # plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
-    # plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    # plt.plot(dates, overpricingc, label="Daily Overpricing per contract (Call)")
-    # plt.plot(dates, overpricingp, label="Daily Overpricing per contract (Put)")
-    # plt.plot(dates, underpricingc, label="Daily Underpricing per contract (Call)")
-    # plt.plot(dates, underpricingp, label="Daily Underpricing per contract (Put)")
-    # # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # # overpricing,underpricing = evalObj.compareModeltoMarket()
-    # # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
-    # # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
+    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
+    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
+    plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
+    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+
     
-    # plt.legend()
-    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    # plt.xlabel('xlabel', fontsize=16)
-    # plt.show()
+    plt.legend()
+    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    plt.xlabel('xlabel', fontsize=16)
+    plt.show()
 
     # print(evalObj.compareModeltoMarket())
     print("Without Rebalancing")

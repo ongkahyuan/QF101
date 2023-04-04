@@ -28,8 +28,8 @@ class GetData:
                      " [C_ASK]": 'c_ask',
                      " [P_BID]": 'p_bid',
                      " [P_ASK]": 'p_ask',
-                     " [C_VEGA]": 'c_vega',
-                     " [P_VEGA]": 'p_vega',
+                     " [C_IV]": 'c_vega',
+                     " [P_IV]": 'p_vega',
                      " [EXPIRE_DATE]": 'expire_date',
                      " [QUOTE_DATE]": 'quote_date'
                      }, axis=1, inplace=True)
