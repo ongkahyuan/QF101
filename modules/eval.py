@@ -91,6 +91,8 @@ class Eval:
                 dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
                 dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
                 dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
+                # print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
+
                 dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
                 dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
                 dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
@@ -433,19 +435,19 @@ class Eval:
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced <fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
                 if len(putsSold) > 5:
-                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
+                    fifthBestPutOverpriced = putsSold.p_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced <fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced <fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
                 if len(callsBought) > 5:
-                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
+                    fifthBestCallUnderpriced = callsBought.c_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
                     callsBought = callsBought.sort_values('c_underpriced', ascending=False).head()
                 if len(putsBought) > 5:
-                    fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
+                    fifthBestPutUnderpriced = putsBought.p_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced <fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
@@ -472,19 +474,16 @@ if __name__ == "__main__":
     df = pd.read_csv(
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
 
-
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp,overpricingctau,overpricingptau, underpricingctau, underpricingptau  = evalObj.compareModeltoMarket()
-    overpricingctau = dict(sorted(overpricingctau.items()))
-    overpricingptau = dict(sorted(overpricingptau.items()))
-    underpricingctau = dict(sorted(underpricingctau.items()))
-    underpricingptau = dict(sorted(underpricingptau.items()))
-
+    overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = evalObj.compareModeltoMarket()
+    print(overpricingc)
+    print(overpricingp)
     plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
-    # plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
-    # plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+
     
     # plt.legend()
     # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
@@ -500,7 +499,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.xticks(rotation = 45) # Rotates X-Axis Ticks by 45-degrees
     plt.xlabel('xlabel', fontsize=10)
-    plt.savefig('overpricing.png')
+    # plt.savefig('overpricing.png')
     plt.show()
 
     # print(evalObj.compareModeltoMarket())

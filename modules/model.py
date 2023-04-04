@@ -115,15 +115,17 @@ class Model:
 
     def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
+        additionalBias = 0.0
         deltaT = tau/N
-        u = math.exp(sigma*math.sqrt(deltaT))+1
+        sigma/=50
+        u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
 # This handles 0 sigma or very small sigma
-        if u-d < 0.0001 or (math.exp((r)*deltaT)-d)/(u-d) > 1:
-            return (max(S-K, 0) if optionType == "call" else max(K-S, 0))
+        if u-d < 0.0001 or (math.exp((r+additionalBias)*deltaT)-d)/(u-d) > 1:
+            return math.exp((r+additionalBias)*tau)*(max(S-K, 0) if optionType == "call" else max(K-S, 0))
 
-        p = (math.exp(r*deltaT)-d)/(u-d)
+        p = (math.exp((r+additionalBias)*deltaT)-d)/(u-d)
 
         if not dividedDates:
             return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)[1]
@@ -272,7 +274,7 @@ if __name__ == '__main__':
     K = 50.0
     tau = 130/365
     # tau = 183/365
-    sigma = 0.4
+    sigma = 80
     r = 0.1
     q = 0.01
     mod = Model()
@@ -280,6 +282,5 @@ if __name__ == '__main__':
     # *mod.model('call', S, K, tau, sigma)))
     # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
     v1 = mod.model('call', S, K, tau, sigma)
-    v2 = mod.modelv2('call', dt.datetime(
-        year=2022, month=7, day=29), S, K, tau, sigma)
+    v2 = mod.modelv2('call', dt.datetime(year=2022, month=7, day=29), S, K, tau, sigma)
     print(v1, v2)
