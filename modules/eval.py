@@ -122,80 +122,11 @@ class Eval:
         currentDay = self.startDate
         modelPoints = []
         marketPoints = []
-        maxModelToMarketDifference = 0
-
-        # index 0 for calls, index 1 for puts
-        underpricing = [0, 0]
-        overpricing = [0, 0]
-        underpricingCounter = [0, 0]
-        overpricingCounter = [0, 0]
-        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
-        columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
-        # modelmarketDf = pd.DataFrame(columns=columns)
-        dailyoverpricingc = []
-        dailyoverpricingp = []
-        dailyunderpricingc = []
-        dailyunderpricingp = []
-        dailyoverpricingctau = collections.defaultdict(list)
-        dailyoverpricingptau = collections.defaultdict(list)
-        dailyunderpricingctau = collections.defaultdict(list)
-        dailyunderpricingptau = collections.defaultdict(list)
         while currentDay < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
             if len(options) == 0:
-                dailyoverpricingc.append(0)
-                dailyoverpricingp.append(0)
-                dailyunderpricingc.append(0)
-                dailyunderpricingp.append(0)
                 currentDay += timedelta(days=1)
                 continue
-            options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-            options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-            options['c_diff'] = abs(options.c_ask - options.model_c)
-            options['p_diff'] = abs(options.p_ask - options.model_p)
-
-
-            underpricing[0] += np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
-            underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
-            overpricing[0] += np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
-            overpricing[1] += np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
-            dailyunderpricingcall = np.maximum((options.c_ask - options.model_c)/options.c_ask, np.zeros(len(options))).sum()
-            dailyunderpricingput = np.maximum((options.p_ask - options.model_p)/options.p_ask, np.zeros(len(options))).sum()
-            dailyoverpricingcall = np.maximum((-options.c_bid + options.model_c)/options.c_bid, np.zeros(len(options))).sum()
-            dailyoverpricingput = np.maximum((-options.p_bid + options.model_p)/options.p_bid, np.zeros(len(options))).sum()
-            dailyoverpricingc.append(dailyoverpricingcall/(len(options)))
-            dailyoverpricingp.append(dailyoverpricingput/(len(options)))
-            dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
-            dailyunderpricingp.append(dailyunderpricingput/(len(options)))
-
-            # contracts += len(options) * 2
-            # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
-            maxModelToMarketDifference = max(
-                maxModelToMarketDifference, options.c_diff.max())
-            maxModelToMarketDifference = max(
-                maxModelToMarketDifference, options.p_diff.max())
-
-            underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
-            underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
-            overpricingCounter[0] += len(options[-options.c_bid+options.model_c > threshold])
-            overpricingCounter[1] += len(options[-options.p_bid+options.model_p > threshold])
-            # modelmarketDf = pd.concat([modelmarketDf,options])
-            for i in options[['tau']].drop_duplicates().values:
-                taudf= options.loc[(options['tau']==i[0])]
-                dailyunderpricingcalltau = np.maximum((taudf.c_ask - taudf.model_c)/taudf.c_ask, np.zeros(len(taudf))).sum()
-                dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
-                dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
-                dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
-                # print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
-
-                dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
-                dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
-                dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
-                dailyunderpricingptau[i[0]].append(dailyunderpricingputtau/(len(taudf)))
-                
-            
-
-
             # options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
             # options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
             options['model_c'] = options.apply(lambda row: model.Model().model(
@@ -214,7 +145,7 @@ class Eval:
         axs[0].legend()
         axs[1].legend()
         plt.show()
-        return dailyoverpricingc, dailyoverpricingp, dailyunderpricingc, dailyunderpricingp,dailyoverpricingctau, dailyoverpricingptau, dailyunderpricingctau, dailyunderpricingptau
+        return
 
     def tradeUntilExpiry(self, spread=0.2, rebalancing=True):
         '''
