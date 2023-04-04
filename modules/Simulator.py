@@ -424,27 +424,33 @@ class Simulator:
             putsBought = putsBought[putsBought.expire_date > currentDay]
 
             if rebalancing:
+                max_positions = 20
+                rebalancing_factor = 0.5
                 # if i have more than 5 positions, remove the ones with the smallest spread
-                if len(callsSold) > 5:
-                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(5).iloc[-1]
+                if len(callsSold) > max_positions:
+                    num_to_keep = max_positions + round((len(callsSold)-max_positions)*rebalancing_factor)
+                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(num_to_keep).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (callsSold[callsSold.c_overpriced < fifthBestCallOverpriced]['c_ask'] + spread).sum()
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced < fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
-                if len(putsSold) > 5:
-                    fifthBestPutOverpriced = putsSold.p_overpriced.nlargest(5).iloc[-1]
+                if len(putsSold) > max_positions:
+                    num_to_keep = max_positions + round((len(callsSold)-max_positions)*rebalancing_factor)
+                    fifthBestPutOverpriced = putsSold.p_overpriced.nlargest(num_to_keep).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced < fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced < fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
-                if len(callsBought) > 5:
-                    fifthBestCallUnderpriced = callsBought.c_underpriced.nlargest(5).iloc[-1]
+                if len(callsBought) > max_positions:
+                    num_to_keep = max_positions + round((len(callsSold)-max_positions)*rebalancing_factor)
+                    fifthBestCallUnderpriced = callsBought.c_underpriced.nlargest(num_to_keep).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
                     callsBought = callsBought.sort_values('c_underpriced', ascending=False).head()
-                if len(putsBought) > 5:
-                    fifthBestPutUnderpriced = putsBought.p_underpriced.nlargest(5).iloc[-1]
+                if len(putsBought) > max_positions:
+                    num_to_keep = max_positions + round((len(callsSold)-max_positions)*rebalancing_factor)
+                    fifthBestPutUnderpriced = putsBought.p_underpriced.nlargest(num_to_keep).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
@@ -470,7 +476,7 @@ class Simulator:
 if __name__ == "__main__":
     df = pd.read_csv("./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
 
-    binaryTreeSim = Simulator(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
+    binaryTreeSim = Simulator(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
     dates = [binaryTreeSim.start_date + timedelta(days=i) for i in range((binaryTreeSim.end_date-binaryTreeSim.start_date).days)]
     overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = binaryTreeSim.compareModeltoMarket()
     print(overpricingc)
