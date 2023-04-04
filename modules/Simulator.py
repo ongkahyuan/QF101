@@ -1,29 +1,57 @@
-# import modules.get_data as getData
-import get_data as getData
+from __future__ import annotations
+from model_data import ModelData
+from model import Model, OptionType, OptionStyle
 import pandas as pd
 from matplotlib import pyplot as plt
 # import model
 import yfinance as yf
 from heapq import heappush, heappop
 from datetime import datetime, timedelta
-import model as model
 import numpy as np
 import sys
 import collections
 
+from typing import Dict
 
-class Eval:
-    def __init__(self, df, startDate: datetime, endDate: datetime):
+
+class Simulator:
+    def __init__(self, df, start_date: datetime, end_date: datetime):
         self.ticker = yf.Ticker('AAPL')
-        self.priceHistory = self.ticker.history(period='1d', start=startDate.strftime(
-            "%Y-%m-%d"), end=endDate.strftime("%Y-%m-%d"))
-        self.startDate = startDate
-        self.endDate = endDate
-        self.df = df
-        self.dataGetter = getData.GetData(df, startDate, endDate)
+        self.priceHistory = self.ticker.history(period='1d', start=start_date.strftime(
+            "%Y-%m-%d"), end=end_date.strftime("%Y-%m-%d"))
+        self.start_date = start_date
+        self.end_date = end_date
+        self.model_data:ModelData = ModelData(df, start_date, end_date)
+        self.model:Model = Model()
+        self.european_option_values:Dict[str, pd.DataFrame] = self._generate_option_prices(OptionStyle.EUROPEAN)
+        self.american_option_values:Dict[str, pd.DataFrame] = self._generate_option_prices(OptionStyle.AMERICAN)
+
+    def get_option_prices(self,style:OptionStyle) -> Dict[str, pd.DataFrame]:
+        target_dict = self.european_option_values if style==OptionStyle.EUROPEAN else self.american_option_values
+        new_dict = {}
+        for key, value in target_dict.items():
+            new_dict[key] = value.copy(deep=True)
+        return new_dict
+
+    def _generate_option_prices(self, style:OptionStyle):
+        option_values = {}
+        currentDay = self.start_date
+        while currentDay < self.end_date:
+            options = self.model_data.getAllCurrentPrice(currentDay)
+            if len(options) == 0:
+                currentDay += timedelta(days=1)
+                continue
+            options['model_c'] = options.apply(lambda row: self.model.calculate_option_price(OptionType.CALL, style, row['S'], row['K'], row['tau'], 0.3), axis=1)
+            options['model_p'] = options.apply(lambda row: self.model.calculate_option_price(OptionType.PUT, style, row['S'], row['K'], row['tau'], 0.3), axis=1)
+            options['c_diff'] = abs(options.c_ask - options.model_c)
+            options['p_diff'] = abs(options.p_ask - options.model_p)
+            option_values[currentDay] = options.copy(deep=True)
+            currentDay += timedelta(days=1)
+        return option_values
+        
 
     def compareModeltoMarket(self, threshold=2):
-        currentDay = self.startDate
+        currentDay = self.start_date
         modelPoints = []
         marketPoints = []
         maxModelToMarketDifference = 0
@@ -33,7 +61,7 @@ class Eval:
         overpricing = [0, 0]
         underpricingCounter = [0, 0]
         overpricingCounter = [0, 0]
-        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
+        columns = list(self.model_data.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
         # modelmarketDf = pd.DataFrame(columns=columns)
         dailyoverpricingc = []
@@ -44,21 +72,17 @@ class Eval:
         dailyoverpricingptau = collections.defaultdict(list)
         dailyunderpricingctau = collections.defaultdict(list)
         dailyunderpricingptau = collections.defaultdict(list)
-        while currentDay < self.endDate:
-            options = self.dataGetter.getAllCurrentPrice(currentDay)
-            if len(options) == 0:
+        euro_option_prices = self.get_option_prices(OptionStyle.EUROPEAN)
+        amer_option_prices = self.get_option_prices(OptionStyle.AMERICAN)
+        while currentDay < self.end_date:
+            options = euro_option_prices.get(currentDay)
+            if options is None:
                 dailyoverpricingc.append(0)
                 dailyoverpricingp.append(0)
                 dailyunderpricingc.append(0)
                 dailyunderpricingp.append(0)
                 currentDay += timedelta(days=1)
                 continue
-            options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-            options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-            options['c_diff'] = abs(options.c_ask - options.model_c)
-            options['p_diff'] = abs(options.p_ask - options.model_p)
-
-
             underpricing[0] += np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
             underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
             overpricing[0] += np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
@@ -90,22 +114,18 @@ class Eval:
                 dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
                 dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
                 dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
-                # print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
+                #print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
 
                 dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
                 dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
                 dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
                 dailyunderpricingptau[i[0]].append(dailyunderpricingputtau/(len(taudf)))
-                
-            
-
 
             # options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
             # options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-            options['model_c'] = options.apply(lambda row: model.Model().model(
-                'call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
-            options['model_p'] = options.apply(lambda row: model.Model().model(
-                'put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
+            # options['model_c'] = options.apply(lambda row: model.Model().model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
+            # options['model_p'] = options.apply(lambda row: model.Model().model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
+            options = amer_option_prices.get(currentDay)
             modelPoints += list(options['model_c']) + list(options['model_p'])
             marketPoints += list(options['c_ask']) + list(options['p_ask'])
             currentDay += timedelta(days=1)
@@ -134,25 +154,26 @@ class Eval:
         (vice versa for options BOUGHT)
         '''
 
-        currentDay = self.startDate
+        currentDay = self.start_date
         losses = {"max_loss_per_call_sold": 0, "max_loss_per_put_sold": 0,
                   "total_call_losses": 0, "total_put_losses": 0}
         profit = {"min_profit_per_call_bought": sys.maxsize,
                   "min_profit_per_put_bought": sys.maxsize, "total_call_profit": 0, "total_put_profit": 0}
 
-        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
+        columns = list(self.model_data.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
         callsBought = pd.DataFrame(columns=columns)
         putsBought = pd.DataFrame(columns=columns)
         callsSold = pd.DataFrame(columns=columns)
         putsSold = pd.DataFrame(columns=columns)
-        modelObj = model.Model()
         currentBalance = 0
         dailyBalance = []
         # index 0 for calls, index 1 for puts
         tradeCounter = [0, 0, 0, 0]
-        while currentDay <= self.endDate:
-            options = self.dataGetter.getAllCurrentPrice(currentDay)
+        euro_option_prices = self.get_option_prices(OptionStyle.EUROPEAN)
+        amer_option_prices = self.get_option_prices(OptionStyle.AMERICAN)
+        while currentDay <= self.end_date:
+            options = euro_option_prices.get(currentDay, [])
 
             # if there are options available, I have to consider purchasing them
             if len(options) > 0:
@@ -165,10 +186,10 @@ class Eval:
                     stockHigh, stockLow = stockPrice, stockPrice
 
                 # print('Date:', currentDay, '\nStock Price:', stockPrice)
-                options['model_c'] = options.apply(lambda row: model.Model().modelv2(
-                    'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-                options['model_p'] = options.apply(lambda row: model.Model().modelv2(
-                    'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
+                # options['model_c'] = options.apply(lambda row: model.Model().modelv2(
+                #     'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+                # options['model_p'] = options.apply(lambda row: model.Model().modelv2(
+                #     'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
 
                 # overpriced: sell because people are willing to pay for higher price that what we think they are worth
                 options['c_overpriced'] = (options.c_bid - options.model_c)
@@ -340,20 +361,21 @@ class Eval:
         exercised when S-K > optionprice + risk free rate
         '''
 
-        currentDay = self.startDate
-        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
+        currentDay = self.start_date
+        columns = list(self.model_data.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced']
         callsBought = pd.DataFrame(columns=columns)
         putsBought = pd.DataFrame(columns=columns)
         callsSold = pd.DataFrame(columns=columns)
         putsSold = pd.DataFrame(columns=columns)
-        modelObj = model.Model()
         currentBalance = 0
         dailyBalance = []
         # index 0 for calls, index 1 for puts
         tradeCounter = [0, 0, 0, 0]
-        while currentDay <= self.endDate:
-            options = self.dataGetter.getAllCurrentPrice(currentDay)
+        euro_option_prices = self.get_option_prices(OptionStyle.EUROPEAN)
+        amer_option_prices = self.get_option_prices(OptionStyle.AMERICAN)
+        while currentDay <= self.end_date:
+            options = euro_option_prices.get(currentDay, [])
 
             # if there are options available, I have to consider purchasing them
             if len(options) > 0:
@@ -366,10 +388,10 @@ class Eval:
                     stockHigh, stockLow = stockPrice, stockPrice
 
                 # print('Date:', currentDay, '\nStock Price:', stockPrice)
-                options['model_c'] = options.apply(lambda row: modelObj.modelv2(
-                    'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-                options['model_p'] = options.apply(lambda row: modelObj.modelv2(
-                    'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
+                # options['model_c'] = options.apply(lambda row: modelObj.modelv2(
+                #     'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+                # options['model_p'] = options.apply(lambda row: modelObj.modelv2(
+                #     'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
 
                 # overpriced: sell because people are willing to pay for higher price that what we think they are worth
                 options['c_overpriced'] = (options.c_bid - options.model_c)
@@ -507,15 +529,16 @@ if __name__ == "__main__":
     df = pd.read_csv(
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
 
-    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = evalObj.compareModeltoMarket()
+    binaryTreeSim = Simulator(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
+    dates = [binaryTreeSim.start_date + timedelta(days=i) for i in range((binaryTreeSim.end_date-binaryTreeSim.start_date).days)]
+    overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = binaryTreeSim.compareModeltoMarket()
     print(overpricingc)
     print(overpricingp)
     plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
     plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+    plt.show()
 
     
     # plt.legend()
@@ -534,12 +557,12 @@ if __name__ == "__main__":
     # plt.show()
 
     print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExercised(
+    withoutRebalancing = binaryTreeSim.tradeUntilExercised(
         rebalancing=False, threshold=1.5)
     print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
-    dates = [evalObj.startDate + timedelta(days=i)
-             for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    withRebalancing = binaryTreeSim.tradeUntilExercised(threshold=1.5)
+    dates = [binaryTreeSim.start_date + timedelta(days=i)
+             for i in range((binaryTreeSim.end_date-binaryTreeSim.start_date).days+1)]
 
     plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
     plt.plot(dates, withRebalancing, label="W Rebalancing")
@@ -548,10 +571,10 @@ if __name__ == "__main__":
     plt.show()
 
     # print("Without Rebalancing")
-    # withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
+    # withoutRebalancing = binaryTreeSim.tradeUntilExercised(rebalancing=False, threshold=1.5)
     # print('\nWith Rebalancing\n')
-    # withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    # withRebalancing = binaryTreeSim.tradeUntilExercised(threshold=1.5)
+    # dates = [binaryTreeSim.start_date + timedelta(days=i) for i in range((binaryTreeSim.end_date-binaryTreeSim.start_date).days+1)]
 
     # plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
     # plt.plot(dates, withRebalancing, label="W Rebalancing")
