@@ -12,6 +12,8 @@ class Model:
     def __init__(self):
         self.dividendHistory = pd.read_csv(
             './DivInfo.csv', parse_dates=['EffDate', 'DeclarationDate'])
+        self.rfRates = pd.read_csv(
+            "./Treasury Yield 10 Years.csv", parse_dates=['Date'])
 
     def binomial_tree_option_pricing(self, S, K, r, q, tau, sigma, N=100):
         """
@@ -113,7 +115,11 @@ class Model:
         amer_value = amer[0][0]
         return euro_value, amer_value
 
-    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.03,  N=10):
+    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma,  N=10, autoR=True):
+        if autoR:
+            r = self.getRfRate(quoteDate)
+        else:
+            r = 0.03
         dividedDates = self.checkIfDividend(tau, quoteDate)
         additionalBias = 0.0
         deltaT = tau/N
@@ -271,6 +277,12 @@ class Model:
                     result.append((candidate, self.estDivPrice(candidate)))
         return result
 
+    def getRfRate(self, date: dt.datetime, rolling_days=4):
+        # print(self.rfRates)
+        rates = self.rfRates.iloc[(
+            self.rfRates['Date']-date).abs().argsort()[:rolling_days]].copy()
+        return rates.loc[:, 'High'].mean()/100
+
 
 if __name__ == '__main__':
     S = 50.0
@@ -284,9 +296,10 @@ if __name__ == '__main__':
     # print('European Value: {0}, American Option Value: {1}'.format(
     # *mod.model('call', S, K, tau, sigma)))
     # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
-    v1 = mod.model('call', S, K, tau, sigma)
-    v2 = mod.modelv2('call', dt.datetime(
-        year=2022, month=7, day=29), S, K, tau, sigma)
-    print(v1, v2)
+    # v1 = mod.model('call', S, K, tau, sigma)
+    # v2 = mod.modelv2('call', dt.datetime(
+    #     year=2022, month=7, day=29), S, K, tau, sigma)
+    # print(v1, v2)
     # price = mod.estDivPrice(dt.datetime(year=2020, month=11, day=5))
     # print(price)
+    print(mod.getRfRate(dt.datetime(2022, 7, 1)))
