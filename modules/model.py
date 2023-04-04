@@ -116,12 +116,12 @@ class Model:
     def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
         deltaT = tau/N
-        u = math.exp(sigma*math.sqrt(deltaT))
+        u = math.exp(sigma*math.sqrt(deltaT))+1
         d = 1/u
 
 # This handles 0 sigma or very small sigma
         if u-d < 0.0001 or (math.exp((r)*deltaT)-d)/(u-d) > 1:
-            return (max(S-K, 0))*2 if optionType == "call" else (max(K-S, 0))*2
+            return (max(S-K, 0) if optionType == "call" else max(K-S, 0))
 
         p = (math.exp(r*deltaT)-d)/(u-d)
 
@@ -216,7 +216,7 @@ class Model:
         #             pt.append(round(tree[0][0]))
         # print(f"CHECK: {pr, pt}")
 
-        return trees[0][0][0][0]*2
+        return trees[0][0][0][0]
 
     def treeGenerator(self, trials):
         return [[0.0 for j in range(i+1)] for i in range(trials+1)]
