@@ -10,6 +10,8 @@ import model as model
 import numpy as np
 import sys
 
+from tree_model import BinomialTreeModel
+
 class Eval:
     def __init__(self, df, startDate: datetime, endDate: datetime):
         self.ticker = yf.Ticker('AAPL')
@@ -49,6 +51,10 @@ class Eval:
                 continue
             options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
             options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
+            # euro_option_values = options.apply(lambda row: BinomialTreeModel.get_euro_option_values_method_1(row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+            # options['model_c'] = [value[0] for value in euro_option_values]
+            # options['model_p'] = [value[1] for value in euro_option_values]
+            
             options['c_diff'] = abs(options.c_ask - options.model_c)
             options['p_diff'] = abs(options.p_ask - options.model_p)
 
@@ -444,17 +450,17 @@ if __name__ == "__main__":
 
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    # plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
-    # plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
-    # plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
-    # plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
+    plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
+    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
     
-    # plt.legend()
-    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    # plt.xlabel('xlabel', fontsize=16)
-    # plt.show()
+    plt.legend()
+    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    plt.xlabel('xlabel', fontsize=16)
+    plt.show()
 
     # print(evalObj.compareModeltoMarket())
     # print("Without Rebalancing")
@@ -467,17 +473,17 @@ if __name__ == "__main__":
     # plt.plot(dates, withRebalancing, label="W Rebalancing")
     
  
-    print("Without Rebalancing")
-    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
-    print('\nWith Rebalancing\n')
-    withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    # print("Without Rebalancing")
+    # withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
+    # print('\nWith Rebalancing\n')
+    # withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
+    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
-    plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
-    plt.plot(dates, withRebalancing, label="W Rebalancing")
+    # plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
+    # plt.plot(dates, withRebalancing, label="W Rebalancing")
     
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")

@@ -4,11 +4,11 @@ from typing import List
 
 
 class Node:
-    def __init__(self, value=-1, depth=0, maxDepth=-1, subBranches:List[Branch] = []):
-        self.value = value
-        self.subBranches:List[Branch] = list(subBranches)
+    def __init__(self, stock_value=-1, option_value=-1, depth=0, subBranches:List[Branch] = None):
+        self.stock_value = stock_value
+        self.option_value = option_value
+        self.subBranches:List[Branch] = list(subBranches) if subBranches is None else list()
         self.depth = depth
-        self.maxDepth = maxDepth
     def createSubBranch(self, probability:float, factor:float):
         newBranch = Branch(probability, factor, self)
         self.subBranches.append(newBranch)

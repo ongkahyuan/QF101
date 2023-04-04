@@ -76,6 +76,7 @@ class Model:
         euro = [[0.0 for j in range(i+1)] for i in range(N+1)]
         amer = [[0.0 for j in range(i+1)] for i in range(N+1)]
 
+        # Populate option prices of the last layer
         for j in range(N+1):
             if optionType == 'call':
                 euro[N][j] = max(0, S*(u**j)*(d**(N-j))-K)
