@@ -115,15 +115,16 @@ class Model:
 
     def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
+        additionalBias = 0.5
         deltaT = tau/N
         u = math.exp(sigma*math.sqrt(deltaT))+1
         d = 1/u
 
 # This handles 0 sigma or very small sigma
-        if u-d < 0.0001 or (math.exp((r)*deltaT)-d)/(u-d) > 1:
-            return (max(S-K, 0) if optionType == "call" else max(K-S, 0))
+        if u-d < 0.0001 or (math.exp((r+additionalBias)*deltaT)-d)/(u-d) > 1:
+            return math.exp((r+additionalBias)*tau)*(max(S-K, 0) if optionType == "call" else max(K-S, 0))
 
-        p = (math.exp(r*deltaT)-d)/(u-d)
+        p = (math.exp((r+additionalBias)*deltaT)-d)/(u-d)
 
         if not dividedDates:
             return self.model(optionType, S, K, tau, sigma, r=r, q=0, N=N)[1]
