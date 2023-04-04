@@ -30,7 +30,6 @@ class Eval:
         overpricing = [0, 0]
         underpricingCounter = [0, 0]
         overpricingCounter = [0, 0]
-        contracts = 0
         columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
         columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
         # modelmarketDf = pd.DataFrame(columns=columns)
@@ -38,7 +37,7 @@ class Eval:
         dailyoverpricingp = []
         dailyunderpricingc = []
         dailyunderpricingp = []
-
+        
 
         while currentDay < self.endDate:
             options = self.dataGetter.getAllCurrentPrice(currentDay)
@@ -66,7 +65,7 @@ class Eval:
             dailyoverpricingp.append(dailyoverpricingput/(len(options)))
             dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
             dailyunderpricingp.append(dailyunderpricingput/(len(options)))
-
+            print(options[['tau']].drop_duplicates())
             # contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
             maxModelToMarketDifference = max(
@@ -445,7 +444,7 @@ class Eval:
 if __name__ == "__main__":
     df = pd.read_csv(
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
-    # date = dt.datetime(2021, 2, 20)
+
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
@@ -454,10 +453,6 @@ if __name__ == "__main__":
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
     plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    # overpricing,underpricing = evalObj.compareModeltoMarket()
-    # plt.plot(dates, overpricing, label="Daily Overpricing per contract")
-    # plt.plot(dates, underpricing, label="Daily Underpricing per contract")
     
     plt.legend()
     plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
