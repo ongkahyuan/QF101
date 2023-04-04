@@ -91,6 +91,8 @@ class Eval:
                 dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
                 dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
                 dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
+                # print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
+
                 dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
                 dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
                 dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
@@ -474,17 +476,19 @@ if __name__ == "__main__":
 
     evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = evalObj.compareModeltoMarket()
+    print(overpricingc)
+    print(overpricingp)
     plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
     plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
 
     
-    plt.legend()
-    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    plt.xlabel('xlabel', fontsize=16)
-    plt.show()
+    # plt.legend()
+    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    # plt.xlabel('xlabel', fontsize=16)
+    # plt.show()
 
 
 
@@ -495,7 +499,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.xticks(rotation = 45) # Rotates X-Axis Ticks by 45-degrees
     plt.xlabel('xlabel', fontsize=10)
-    plt.savefig('overpricing.png')
+    # plt.savefig('overpricing.png')
     plt.show()
 
     # print(evalObj.compareModeltoMarket())

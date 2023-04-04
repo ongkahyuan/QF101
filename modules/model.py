@@ -115,9 +115,10 @@ class Model:
 
     def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
-        additionalBias = 0.5
+        additionalBias = 0.0
         deltaT = tau/N
-        u = math.exp(sigma*math.sqrt(deltaT))+1
+        sigma/=50
+        u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
 # This handles 0 sigma or very small sigma
@@ -273,14 +274,13 @@ if __name__ == '__main__':
     K = 50.0
     tau = 130/365
     # tau = 183/365
-    sigma = 0.7
+    sigma = 80
     r = 0.1
     q = 0.01
     mod = Model()
     # print('European Value: {0}, American Option Value: {1}'.format(
     # *mod.model('call', S, K, tau, sigma)))
     # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
-    v1 = mod.model('put', S, K, tau, sigma)
-    v2 = mod.modelv2('put', dt.datetime(
-        year=2022, month=7, day=29), S, K, tau, sigma)
+    v1 = mod.model('call', S, K, tau, sigma)
+    v2 = mod.modelv2('call', dt.datetime(year=2022, month=7, day=29), S, K, tau, sigma)
     print(v1, v2)
