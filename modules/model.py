@@ -234,16 +234,6 @@ class Model:
                     trees[layerIndex+1][treeIndex *
                                         len(tree) + i][0][0] = nextSSP - div
 
-    def backPropOptionPrices(self, optionType, deltaT, r, trees, layerIndex):
-        discount = math.exp(-r*deltaT)
-        layer = trees[layerIndex]
-        for treeIndex in range(len(layer)):
-            for nodeI in range(len(layer[treeIndex])):
-                for nodeJ in range(nodeI+1):
-                    payoff = 0
-                    if optionType == 'call':
-                        payoff = discount*p
-
         if layerIndex != 0:
             # set the prev layer tail option price
             pass
