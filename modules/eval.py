@@ -10,7 +10,6 @@ import model as model
 import numpy as np
 import sys
 
-
 class Eval:
     def __init__(self, df, startDate: datetime, endDate: datetime):
         self.ticker = yf.Ticker('AAPL')
@@ -392,29 +391,31 @@ class Eval:
             tradeCounter[1] += len(putsBought[putsBought.expire_date <= currentDay])
             putsBought = putsBought[putsBought.expire_date > currentDay]
 
+
+            idk = 50
+            idk2 = 70
             if rebalancing:
                 # if i have more than 5 positions, remove the ones with the smallest spread
-                if len(callsSold) > 5:
-                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(
-                        5).iloc[-1]
+                if len(callsSold) > idk:
+                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(idk2).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (callsSold[callsSold.c_overpriced <fifthBestCallOverpriced]['c_ask'] + spread).sum()
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced <fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
-                if len(putsSold) > 5:
-                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
+                if len(putsSold) > idk:
+                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(idk2).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced <fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced <fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
-                if len(callsBought) > 5:
-                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
+                if len(callsBought) > idk:
+                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(idk2).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     tradeCounter[0] += len(callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced])
                     callsBought = callsBought.sort_values('c_underpriced', ascending=False).head()
-                if len(putsBought) > 5:
-                    fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(5).iloc[-1]
+                if len(putsBought) > idk:
+                    fifthBestPutUnderpriced = callsSold.p_underpriced.nlargest(idk2).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (putsBought[putsBought.p_underpriced <fifthBestPutUnderpriced]['p_bid'] - spread).sum()
                     tradeCounter[1] += len(putsBought[putsBought.p_underpriced < fifthBestPutUnderpriced])
@@ -442,18 +443,18 @@ if __name__ == "__main__":
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
 
 
-    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
-    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
-    overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
-    plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
-    plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
-    plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
-    plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
+    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
+    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
+    # overpricingc,overpricingp, underpricingc, underpricingp = evalObj.compareModeltoMarket()
+    # plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
+    # plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
+    # plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
+    # plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
     
-    plt.legend()
-    plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    plt.xlabel('xlabel', fontsize=16)
-    plt.show()
+    # plt.legend()
+    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
+    # plt.xlabel('xlabel', fontsize=16)
+    # plt.show()
 
     # print(evalObj.compareModeltoMarket())
     # print("Without Rebalancing")
@@ -466,17 +467,17 @@ if __name__ == "__main__":
     # plt.plot(dates, withRebalancing, label="W Rebalancing")
     
  
-    # print("Without Rebalancing")
-    # withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
-    # print('\nWith Rebalancing\n')
-    # withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
-    # dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
+    print("Without Rebalancing")
+    withoutRebalancing = evalObj.tradeUntilExercised(rebalancing=False, threshold=1.5)
+    print('\nWith Rebalancing\n')
+    withRebalancing = evalObj.tradeUntilExercised(threshold=1.5)
+    dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days+1)]
     
-    # plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
-    # plt.plot(dates, withRebalancing, label="W Rebalancing")
+    plt.plot(dates, withoutRebalancing, label="W/O Rebalancing")
+    plt.plot(dates, withRebalancing, label="W Rebalancing")
     
-    # plt.legend()
-    # plt.show()
+    plt.legend()
+    plt.show()
 
     # print(gd.getAllCurrentPrice("2022-07-01"))
     # gd.getAllCurrentPrice("2022-07-04")
