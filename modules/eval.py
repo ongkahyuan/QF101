@@ -21,8 +21,104 @@ class Eval:
         self.endDate = endDate
         self.df = df
         self.dataGetter = getData.GetData(df, startDate, endDate)
-
+    
     def compareModeltoMarket(self, threshold=2):
+        currentDay = self.startDate
+        maxModelToMarketDifference = 0
+
+        # index 0 for calls, index 1 for puts
+        underpricing = [0, 0]
+        overpricing = [0, 0]
+        underpricingCounter = [0, 0]
+        overpricingCounter = [0, 0]
+        columns = list(self.dataGetter.getAllCurrentPrice(currentDay).columns)
+        columns += ['underpriced', 'overpriced', 'min_profit', 'max_loss']
+        # modelmarketDf = pd.DataFrame(columns=columns)
+        dailyoverpricingc = []
+        dailyoverpricingp = []
+        dailyunderpricingc = []
+        dailyunderpricingp = []
+        dailyoverpricingctau = collections.defaultdict(list)
+        dailyoverpricingptau = collections.defaultdict(list)
+        dailyunderpricingctau = collections.defaultdict(list)
+        dailyunderpricingptau = collections.defaultdict(list)
+
+        while currentDay < self.endDate:
+            options = self.dataGetter.getAllCurrentPrice(currentDay)
+            if len(options)==0:
+                dailyoverpricingc.append(0)
+                dailyoverpricingp.append(0)
+                dailyunderpricingc.append(0)
+                dailyunderpricingp.append(0)
+                currentDay += timedelta(days=1)
+                continue
+            options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
+            options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
+            options['c_diff'] = abs(options.c_ask - options.model_c)
+            options['p_diff'] = abs(options.p_ask - options.model_p)
+
+
+            underpricing[0] += np.maximum(options.c_ask - options.model_c, np.zeros(len(options))).sum()
+            underpricing[1] += np.maximum(options.p_ask - options.model_p, np.zeros(len(options))).sum()
+            overpricing[0] += np.maximum(-options.c_bid + options.model_c, np.zeros(len(options))).sum()
+            overpricing[1] += np.maximum(-options.p_bid + options.model_p, np.zeros(len(options))).sum()
+            dailyunderpricingcall = np.maximum((options.c_ask - options.model_c)/options.c_ask, np.zeros(len(options))).sum()
+            dailyunderpricingput = np.maximum((options.p_ask - options.model_p)/options.p_ask, np.zeros(len(options))).sum()
+            dailyoverpricingcall = np.maximum((-options.c_bid + options.model_c)/options.c_bid, np.zeros(len(options))).sum()
+            dailyoverpricingput = np.maximum((-options.p_bid + options.model_p)/options.p_bid, np.zeros(len(options))).sum()
+            dailyoverpricingc.append(dailyoverpricingcall/(len(options)))
+            dailyoverpricingp.append(dailyoverpricingput/(len(options)))
+            dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
+            dailyunderpricingp.append(dailyunderpricingput/(len(options)))
+
+            # contracts += len(options) * 2
+            # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
+            maxModelToMarketDifference = max(
+                maxModelToMarketDifference, options.c_diff.max())
+            maxModelToMarketDifference = max(
+                maxModelToMarketDifference, options.p_diff.max())
+
+            underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
+            underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
+            overpricingCounter[0] += len(options[-options.c_bid+options.model_c > threshold])
+            overpricingCounter[1] += len(options[-options.p_bid+options.model_p > threshold])
+            # modelmarketDf = pd.concat([modelmarketDf,options])
+            for i in options[['tau']].drop_duplicates().values:
+                taudf= options.loc[(options['tau']==i[0])]
+                dailyunderpricingcalltau = np.maximum((taudf.c_ask - taudf.model_c)/taudf.c_ask, np.zeros(len(taudf))).sum()
+                dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
+                dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
+                dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
+                # print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
+
+                dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
+                dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
+                dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
+                dailyunderpricingptau[i[0]].append(dailyunderpricingputtau/(len(taudf)))
+            currentDay += timedelta(days=1)
+        
+        for i in dailyoverpricingctau.keys():
+            dailyoverpricingctau[i] = sum(dailyoverpricingctau[i])/len(dailyoverpricingctau[i])
+        for i in dailyoverpricingptau.keys():
+            dailyoverpricingptau[i] = sum(dailyoverpricingptau[i])/len(dailyoverpricingptau[i])
+        for i in dailyunderpricingctau.keys():
+            dailyunderpricingctau[i] = sum(dailyunderpricingctau[i])/len(dailyunderpricingctau[i])
+        for i in dailyunderpricingptau.keys():
+            dailyunderpricingptau[i] = sum(dailyunderpricingptau[i])/len(dailyunderpricingptau[i])
+        
+            
+
+        # just return the variance from market price??
+        # print("CALL OVERPRICED ", overpricingCounter[0])
+        # print("PUT OVERPRICED", overpricingCounter[1])
+        # print("CALL UNDERPRICED", underpricingCounter[0])
+        # print("PUT UNDERPRICED", underpricingCounter[1])
+        # print("number of contracts processed: ", contracts)
+        # print("max difference between model price and market price:", maxModelToMarketDifference)
+        # return "Overpricing per contract: ", sum(overpricing)/contracts, "Underpricing per contract: ", sum(underpricing)/contracts
+        # return modelmarketDf
+        return dailyoverpricingc, dailyoverpricingp, dailyunderpricingc, dailyunderpricingp,dailyoverpricingctau, dailyoverpricingptau, dailyunderpricingctau, dailyunderpricingptau
+    def compareModeltoMarketDistribution(self, threshold=2):
         currentDay = self.startDate
         modelPoints = []
         marketPoints = []
@@ -507,31 +603,18 @@ if __name__ == "__main__":
     df = pd.read_csv(
         "./trimmed.csv", parse_dates=[" [EXPIRE_DATE]", " [QUOTE_DATE]"], low_memory=False)
 
-    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 8, 1))
+    evalObj = Eval(df, datetime(2022, 7, 1), datetime(2022, 12, 1))
     dates = [evalObj.startDate + timedelta(days=i) for i in range((evalObj.endDate-evalObj.startDate).days)]
     overpricingc,overpricingp, underpricingc, underpricingp,x,y,z,t = evalObj.compareModeltoMarket()
-    print(overpricingc)
-    print(overpricingp)
     plt.plot(dates, overpricingc, label="Daily Overpricing % Spread per contract (Call)")
     plt.plot(dates, overpricingp, label="Daily Overpricing % Spread per contract (Put)")
     plt.plot(dates, underpricingc, label="Daily Underpricing % Spread per contract (Call)")
     plt.plot(dates, underpricingp, label="Daily Underpricing % Spread per contract (Put)")
-
-    
-    # plt.legend()
-    # plt.xticks(rotation = 90) # Rotates X-Axis Ticks by 45-degrees
-    # plt.xlabel('xlabel', fontsize=16)
-    # plt.show()
-
-    # plt.plot(list(overpricingctau.keys()),list(overpricingctau.values()),label="Overpricing % Spread per contract (Call)")
-    # plt.plot(list(overpricingptau.keys()),list(overpricingptau.values()),label="Overpricing % Spread per contract (Put)")
-    # plt.plot(list(underpricingctau.keys()),list(underpricingctau.values()),label="Underpricing % Spread per contract (Call)")
-    # # plt.plot(list(underpricingptau.keys()),list(underpricingptau.values()),label="Underpricing % Spread per contract (Put)")
-    # plt.legend()
-    # plt.xticks(rotation = 45) # Rotates X-Axis Ticks by 45-degrees
-    # plt.xlabel('xlabel', fontsize=10)
-    # # plt.savefig('overpricing.png')
-    # plt.show()
+    plt.legend()
+    plt.xticks(rotation = 45) # Rotates X-Axis Ticks by 45-degrees
+    plt.xlabel('xlabel', fontsize=10)
+    # plt.savefig('overpricing.png')
+    plt.show()
 
     print("Without Rebalancing")
     withoutRebalancing = evalObj.tradeUntilExercised(
