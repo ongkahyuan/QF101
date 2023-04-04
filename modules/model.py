@@ -117,7 +117,7 @@ class Model:
         dividedDates = self.checkIfDividend(tau, quoteDate)
         additionalBias = 0.0
         deltaT = tau/N
-        sigma/=50
+        sigma /= 50
         u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
@@ -240,7 +240,10 @@ class Model:
             pass
 
     def estDivPrice(self, date: dt.datetime) -> int:
-        year = int(str(date.year)[-2:])
+        offset = 0
+        if date.month == 2:
+            offset = -1
+        year = int(str(date.year + offset)[-2:])
         return round(0.015*year - 0.095, 3)
 
     def checkIfDividend(self, tau: float, quoteDate: dt.datetime):
@@ -282,5 +285,8 @@ if __name__ == '__main__':
     # *mod.model('call', S, K, tau, sigma)))
     # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
     v1 = mod.model('call', S, K, tau, sigma)
-    v2 = mod.modelv2('call', dt.datetime(year=2022, month=7, day=29), S, K, tau, sigma)
+    v2 = mod.modelv2('call', dt.datetime(
+        year=2022, month=7, day=29), S, K, tau, sigma)
     print(v1, v2)
+    # price = mod.estDivPrice(dt.datetime(year=2020, month=11, day=5))
+    # print(price)
