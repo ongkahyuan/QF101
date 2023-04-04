@@ -59,10 +59,10 @@ class Model:
 
         return (european_call_price, european_put_price, american_call_price, american_put_price)
 
-    def model(self, optionType, S, K, tau, sigma, r=0.034, q=0.017, N=100):
+    def model(self, optionType, S, K, tau, sigma, r=0.03, q=0.00, N=100):
         if optionType != 'call' and optionType != 'put':
             return 'Invalid option type', 'Invalid option type'
-
+        sigma = 0.3
         deltaT = tau/N
         u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
@@ -113,11 +113,11 @@ class Model:
         amer_value = amer[0][0]
         return euro_value, amer_value
 
-    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.034,  N=10):
+    def modelv2(self, optionType, quoteDate,  S, K, tau, sigma, r=0.03,  N=10):
         dividedDates = self.checkIfDividend(tau, quoteDate)
         additionalBias = 0.0
         deltaT = tau/N
-        sigma /= 50
+        sigma = 0.3
         u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
