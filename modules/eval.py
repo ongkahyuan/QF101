@@ -72,7 +72,7 @@ class Eval:
             dailyoverpricingp.append(dailyoverpricingput/(len(options)))
             dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
             dailyunderpricingp.append(dailyunderpricingput/(len(options)))
-
+            print(options[['c_vega']].drop_duplicates())
             # contracts += len(options) * 2
             # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
             maxModelToMarketDifference = max(
