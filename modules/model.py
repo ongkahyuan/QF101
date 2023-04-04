@@ -161,7 +161,7 @@ class Model:
 
 
     def calculate_option_price(self, type:OptionType, style:OptionStyle, S, K, tau, sigma, r=0.03, q=0.0, N=10, quote_date = None):
-        dividend_dates = self._checkIfDividend(tau, quote_date) if quote_date is not None else False
+        dividend_dates = self._checkIfDividend(tau, quote_date) if quote_date is not None else []
         if not dividend_dates:
             return self._calc_opt_price_model1(type, style, S, K, tau, sigma, r, q, N)
         else:
