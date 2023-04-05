@@ -61,7 +61,7 @@ class Model:
 
         return (european_call_price, european_put_price, american_call_price, american_put_price)
 
-    def model(self, optionType, S, K, tau, sigma, r=0.03, q=0.00, N=100):
+    def model(self, optionType, S, K, tau, sigma, r=0.03, q=0.005, N=10):
         if optionType != 'call' and optionType != 'put':
             return 'Invalid option type', 'Invalid option type'
         sigma = 0.3
@@ -277,7 +277,7 @@ class Model:
                     result.append((candidate, self.estDivPrice(candidate)))
         return result
 
-    def getRfRate(self, date: dt.datetime, rolling_days=4):
+    def getRfRate(self, date: dt.datetime, rolling_days=30):
         # print(self.rfRates)
         rates = self.rfRates.iloc[(
             self.rfRates['Date']-date).abs().argsort()[:rolling_days]].copy()
@@ -296,10 +296,10 @@ if __name__ == '__main__':
     # print('European Value: {0}, American Option Value: {1}'.format(
     # *mod.model('call', S, K, tau, sigma)))
     # mod.checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
-    # v1 = mod.model('call', S, K, tau, sigma)
-    # v2 = mod.modelv2('call', dt.datetime(
-    #     year=2022, month=7, day=29), S, K, tau, sigma)
-    # print(v1, v2)
+    v1 = mod.model('call', S, K, tau, sigma)
+    v2 = mod.modelv2('call', dt.datetime(
+        year=2022, month=7, day=29), S, K, tau, sigma)
+    print(v1, v2)
     # price = mod.estDivPrice(dt.datetime(year=2020, month=11, day=5))
     # print(price)
     print(mod.getRfRate(dt.datetime(2022, 7, 1)))
