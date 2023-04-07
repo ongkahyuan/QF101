@@ -95,37 +95,25 @@ class Simulator:
             dailyoverpricingp.append(dailyoverpricingput/(len(options)))
             dailyunderpricingc.append(dailyunderpricingcall/(len(options)))
             dailyunderpricingp.append(dailyunderpricingput/(len(options)))
-
-            # contracts += len(options) * 2
-            # print(pd.concat([options.model_c, options.c_ask, options.c_diff], axis=1).head())
-            maxModelToMarketDifference = max(
-                maxModelToMarketDifference, options.c_diff.max())
-            maxModelToMarketDifference = max(
-                maxModelToMarketDifference, options.p_diff.max())
+            maxModelToMarketDifference = max(maxModelToMarketDifference, options.c_diff.max())
+            maxModelToMarketDifference = max(maxModelToMarketDifference, options.p_diff.max())
 
             underpricingCounter[0] += len(options[options.c_ask-options.model_c > threshold])
             underpricingCounter[1] += len(options[options.p_ask-options.model_p > threshold])
             overpricingCounter[0] += len(options[-options.c_bid+options.model_c > threshold])
             overpricingCounter[1] += len(options[-options.p_bid+options.model_p > threshold])
-            # modelmarketDf = pd.concat([modelmarketDf,options])
             for i in options[['tau']].drop_duplicates().values:
                 taudf= options.loc[(options['tau']==i[0])]
                 dailyunderpricingcalltau = np.maximum((taudf.c_ask - taudf.model_c)/taudf.c_ask, np.zeros(len(taudf))).sum()
                 dailyunderpricingputtau = np.maximum((taudf.p_ask - taudf.model_p)/taudf.p_ask, np.zeros(len(taudf))).sum()
                 dailyoverpricingcalltau = np.maximum((-taudf.c_bid + taudf.model_c)/taudf.c_bid, np.zeros(len(taudf))).sum()
                 dailyoverpricingputtau = np.maximum((-taudf.p_bid + taudf.model_p)/taudf.p_bid, np.zeros(len(taudf))).sum()
-                #print((taudf.c_ask-taudf.model_c)/taudf.c_ask)
 
                 dailyoverpricingctau[i[0]].append(dailyoverpricingcalltau/(len(taudf)))
                 dailyoverpricingptau[i[0]].append(dailyoverpricingputtau/(len(taudf)))
                 dailyunderpricingctau[i[0]].append(dailyunderpricingcalltau/(len(taudf)))
                 dailyunderpricingptau[i[0]].append(dailyunderpricingputtau/(len(taudf)))
 
-            # options['model_c'] = options.apply(lambda row: model.Model().modelv2('call',row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-            # options['model_p'] = options.apply(lambda row: model.Model().modelv2('put', row['quote_date'],row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-            # options['model_c'] = options.apply(lambda row: model.Model().model('call', row['S'], row['K'], row['tau'], row['c_vega'])[1], axis=1)
-            # options['model_p'] = options.apply(lambda row: model.Model().model('put', row['S'], row['K'], row['tau'], row['p_vega'])[1], axis=1)
-            #options = amer_option_prices.get(currentDay)
             modelPoints += list(options['model_c']) + list(options['model_p'])
             marketPoints += list(options['c_ask']) + list(options['p_ask'])
             currentDay += timedelta(days=1)
@@ -185,12 +173,6 @@ class Simulator:
                 else:
                     stockHigh, stockLow = stockPrice, stockPrice
 
-                # print('Date:', currentDay, '\nStock Price:', stockPrice)
-                # options['model_c'] = options.apply(lambda row: model.Model().modelv2(
-                #     'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-                # options['model_p'] = options.apply(lambda row: model.Model().modelv2(
-                #     'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
-
                 # overpriced: sell because people are willing to pay for higher price that what we think they are worth
                 options['c_overpriced'] = (options.c_bid - options.model_c)
                 options['p_overpriced'] = (options.p_bid - options.model_p)
@@ -199,80 +181,51 @@ class Simulator:
                 options['p_underpriced'] = (options.model_p - options.p_ask)
 
                 # give me top 5 that if the difference is greater than the spread
-                top5overpricedCallOptions = options[options['c_overpriced'] > spread].sort_values(
-                    'c_overpriced', ascending=False).head()
-                top5overpricedPutOptions = options[options['p_overpriced'] > spread].sort_values(
-                    'p_overpriced', ascending=False).head()
-                top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values(
-                    'c_underpriced', ascending=False).head()
-                top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values(
-                    'p_underpriced', ascending=False).head()
+                top5overpricedCallOptions = options[options['c_overpriced'] > spread].sort_values('c_overpriced', ascending=False).head()
+                top5overpricedPutOptions = options[options['p_overpriced'] > spread].sort_values('p_overpriced', ascending=False).head()
+                top5underpricedCallOptions = options[options['c_underpriced'] > spread].sort_values('c_underpriced', ascending=False).head()
+                top5underpricedPutOptions = options[options['p_underpriced'] > spread].sort_values('p_underpriced', ascending=False).head()
                 # min profit assumes that we exercised the option at the worst possible time
-                top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(
-                    lambda row: max(stockHigh-row['K'], 0), axis=1)
-                top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(
-                    lambda row: max(row['K']-stockLow, 0), axis=1)
+                top5underpricedCallOptions['min_profit'] = top5underpricedCallOptions.apply(lambda row: max(stockHigh-row['K'], 0), axis=1)
+                top5underpricedPutOptions['min_profit'] = top5underpricedPutOptions.apply(lambda row: max(row['K']-stockLow, 0), axis=1)
                 # max_loss assumes that the buyer exercised the option at the best possible time
-                top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(
-                    lambda row: max(stockHigh-row['K'], 0), axis=1)
-                top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(
-                    lambda row: max(row['K']-stockLow, 0), axis=1)
+                top5overpricedCallOptions['max_loss'] = top5overpricedCallOptions.apply(lambda row: max(stockHigh-row['K'], 0), axis=1)
+                top5overpricedPutOptions['max_loss'] = top5overpricedPutOptions.apply(lambda row: max(row['K']-stockLow, 0), axis=1)
 
-                callsBought = pd.concat(
-                    [callsBought, top5underpricedCallOptions])
+                callsBought = pd.concat([callsBought, top5underpricedCallOptions])
                 putsBought = pd.concat([putsBought, top5underpricedPutOptions])
                 callsSold = pd.concat([callsSold, top5overpricedCallOptions])
                 putsSold = pd.concat([putsSold, top5overpricedPutOptions])
 
                 # #update current balance after selling and buying options
-                currentBalance -= (top5underpricedCallOptions.c_ask +
-                                   spread).sum()
-                currentBalance -= (top5underpricedPutOptions.p_ask +
-                                   spread).sum()
-                currentBalance += (top5overpricedCallOptions.c_bid -
-                                   spread).sum()
-                currentBalance += (top5overpricedPutOptions.c_bid -
-                                   spread).sum()
+                currentBalance -= (top5underpricedCallOptions.c_ask +spread).sum()
+                currentBalance -= (top5underpricedPutOptions.p_ask +spread).sum()
+                currentBalance += (top5overpricedCallOptions.c_bid -spread).sum()
+                currentBalance += (top5overpricedPutOptions.c_bid -spread).sum()
 
                 # check positions PnL update worst possible profit and highest possible loss
-                callsBought['min_profit'] = callsBought.apply(
-                    lambda row: min(row['min_profit'], stockHigh-row['K']), axis=1)
-                putsBought['min_profit'] = putsBought.apply(
-                    lambda row: min(row['min_profit'], row['K']-stockLow), axis=1)
-                callsSold['max_loss'] = callsSold.apply(lambda row: max(
-                    stockHigh-row['K'], row['max_loss'], 0), axis=1)
-                putsSold['max_loss'] = putsSold.apply(lambda row: max(
-                    row['K']-stockLow, row['max_loss'], 0), axis=1)
+                callsBought['min_profit'] = callsBought.apply(lambda row: min(row['min_profit'], stockHigh-row['K']), axis=1)
+                putsBought['min_profit'] = putsBought.apply(lambda row: min(row['min_profit'], row['K']-stockLow), axis=1)
+                callsSold['max_loss'] = callsSold.apply(lambda row: max(stockHigh-row['K'], row['max_loss'], 0), axis=1)
+                putsSold['max_loss'] = putsSold.apply(lambda row: max(row['K']-stockLow, row['max_loss'], 0), axis=1)
 
             # add max loss and min profit close expired positions
-            currentBalance -= callsSold[callsSold.expire_date <=
-                                        currentDay]['max_loss'].sum()
+            currentBalance -= callsSold[callsSold.expire_date <=currentDay]['max_loss'].sum()
             tradeCounter[2] += len(callsSold[callsSold.expire_date <= currentDay])
-            losses['total_call_losses'] += callsSold[callsSold.expire_date <=
-                                                     currentDay]['max_loss'].sum()
-            losses['max_loss_per_call_sold'] = max(
-                losses['max_loss_per_call_sold'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
-            currentBalance -= putsSold[putsSold.expire_date <=
-                                       currentDay]['max_loss'].sum()
+            losses['total_call_losses'] += callsSold[callsSold.expire_date <=currentDay]['max_loss'].sum()
+            losses['max_loss_per_call_sold'] = max(losses['max_loss_per_call_sold'], callsSold[callsSold.expire_date <= currentDay]['max_loss'].max())
+            currentBalance -= putsSold[putsSold.expire_date <=currentDay]['max_loss'].sum()
             tradeCounter[3] += len(putsSold[putsSold.expire_date <= currentDay])
-            losses['total_put_losses'] += putsSold[putsSold.expire_date <=
-                                                   currentDay]['max_loss'].sum()
-            losses['max_loss_per_put_sold'] = max(
-                losses['max_loss_per_put_sold'], putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
-            currentBalance += callsBought[callsBought.expire_date <=
-                                          currentDay]['min_profit'].sum()
+            losses['total_put_losses'] += putsSold[putsSold.expire_date <=currentDay]['max_loss'].sum()
+            losses['max_loss_per_put_sold'] = max(losses['max_loss_per_put_sold'], putsSold[putsSold.expire_date <= currentDay]['max_loss'].max())
+            currentBalance += callsBought[callsBought.expire_date <=currentDay]['min_profit'].sum()
             tradeCounter[0] += len(callsBought[callsBought.expire_date <= currentDay])
-            profit['total_call_profit'] += callsBought[callsBought.expire_date <=
-                                                       currentDay]['min_profit'].sum()
-            profit['min_profit_per_call_bought'] = min(
-                profit['min_profit_per_call_bought'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
-            currentBalance += putsBought[putsBought.expire_date <=
-                                         currentDay]['min_profit'].sum()
+            profit['total_call_profit'] += callsBought[callsBought.expire_date <=currentDay]['min_profit'].sum()
+            profit['min_profit_per_call_bought'] = min(profit['min_profit_per_call_bought'], callsBought[callsBought.expire_date <= currentDay]['min_profit'].min())
+            currentBalance += putsBought[putsBought.expire_date <=currentDay]['min_profit'].sum()
             tradeCounter[1] += len(putsBought[putsBought.expire_date <= currentDay])
-            profit['total_put_profit'] += putsBought[putsBought.expire_date <=
-                                                     currentDay]['min_profit'].sum()
-            profit['min_profit_per_put_bought'] = min(
-                profit['min_profit_per_put_bought'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
+            profit['total_put_profit'] += putsBought[putsBought.expire_date <=currentDay]['min_profit'].sum()
+            profit['min_profit_per_put_bought'] = min(profit['min_profit_per_put_bought'], putsBought[putsBought.expire_date <= currentDay]['min_profit'].min())
 
             # close positions by filtering out expired options
             callsSold = callsSold[callsSold.expire_date > currentDay]
@@ -283,24 +236,21 @@ class Simulator:
             if rebalancing:
                 # if i have more than 5 positions, remove the ones with the smallest spread
                 if len(callsSold) > 5:
-                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(
-                        5).iloc[-1]
+                    fifthBestCallOverpriced = callsSold.c_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (callsSold[callsSold.c_overpriced < fifthBestCallOverpriced]['c_ask'] + spread).sum()
                     currentBalance -= (callsSold[callsSold.c_overpriced < fifthBestCallOverpriced]['max_loss']).sum()
                     tradeCounter[2] += len(callsSold[callsSold.c_overpriced < fifthBestCallOverpriced])
                     callsSold = callsSold.sort_values('c_overpriced', ascending=False).head()
                 if len(putsSold) > 5:
-                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(
-                        5).iloc[-1]
+                    fifthBestPutOverpriced = callsSold.p_overpriced.nlargest(5).iloc[-1]
                     # buy back options sold that are worse than fifth best
                     currentBalance -= (putsSold[putsSold.p_overpriced < fifthBestPutOverpriced]['p_ask'] + spread).sum()
                     currentBalance -= (putsSold[putsSold.p_overpriced < fifthBestPutOverpriced]['max_loss']).sum()
                     tradeCounter[3] += len(putsSold[putsSold.p_overpriced < fifthBestPutOverpriced])
                     putsSold = putsSold.sort_values('p_overpriced', ascending=False).head()
                 if len(callsBought) > 5:
-                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(
-                        5).iloc[-1]
+                    fifthBestCallUnderpriced = callsSold.c_underpriced.nlargest(5).iloc[-1]
                     # sell back options sold that are worse than fifth best
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['c_bid'] - spread).sum()
                     currentBalance += (callsBought[callsBought.c_underpriced < fifthBestCallUnderpriced]['min_profit']).sum()
@@ -365,12 +315,6 @@ class Simulator:
                     stockHigh, stockLow = history.High, history.Low
                 else:
                     stockHigh, stockLow = stockPrice, stockPrice
-
-                # print('Date:', currentDay, '\nStock Price:', stockPrice)
-                # options['model_c'] = options.apply(lambda row: modelObj.modelv2(
-                #     'call', row['quote_date'], row['S'], row['K'], row['tau'], row['c_vega']), axis=1)
-                # options['model_p'] = options.apply(lambda row: modelObj.modelv2(
-                #     'put', row['quote_date'], row['S'], row['K'], row['tau'], row['p_vega']), axis=1)
 
                 # overpriced: sell because people are willing to pay for higher price that what we think they are worth
                 options['c_overpriced'] = (options.c_bid - options.model_c)
@@ -465,12 +409,6 @@ class Simulator:
         for i in range(4):
             print(trades[i], ": ", tradeCounter[i])
         return dailyBalance
-
-    def maximumLoss(self, modelCallPrice, modelPutPrice, marketcallPrice, marketPutPrice, start, expire):
-        # first identify whether i will buy or sell the option
-        # then figure out minLoss, maxLoss, minProfit, maxProfit given the movement of the stockprice
-
-        pass
 
 
 if __name__ == "__main__":

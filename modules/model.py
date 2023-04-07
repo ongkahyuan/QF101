@@ -22,8 +22,9 @@ class Model:
 
     def __init__(self):
         self.dividendHistory = pd.read_csv('./DivInfo.csv', parse_dates=['EffDate', 'DeclarationDate'])
+        self.rfRates = pd.read_csv("./Treasury Yield 10 Years.csv", parse_dates=['Date'])
 
-    def _calc_opt_price_model1(self, type:OptionType, style:OptionStyle, S, K, tau, sigma, r=0.03, q=0.00, N=100):
+    def _calc_opt_price_model1(self, otype:OptionType, style:OptionStyle, S, K, tau, sigma, r=0.03, q=0.00, N=100):
         # Intermediate variables
         deltaT = tau/N
         u = math.exp(sigma*math.sqrt(deltaT))
@@ -31,7 +32,7 @@ class Model:
 
         # This handles 0 sigma or very small sigma
         if u-d < 0.0001 or (math.exp((r-q)*deltaT)-d)/(u-d) > 1:
-            return max(S-K, 0) if type == OptionType.CALL else max(K-S, 0)
+            return max(S-K, 0) if otype == OptionType.CALL else max(K-S, 0)
 
         # Intermediate variables (cont'd)
         p = (math.exp((r-q)*deltaT)-d)/(u-d)
@@ -42,7 +43,7 @@ class Model:
 
         # Populate terminal layer
         for j in range(N+1):
-            tree[N][j] = max(0, S*(u**j)*(d**(N-j))-K) if type == OptionType.CALL else max(0, K-S*(u**j)*(d**(N-j)))
+            tree[N][j] = max(0, S*(u**j)*(d**(N-j))-K) if otype == OptionType.CALL else max(0, K-S*(u**j)*(d**(N-j)))
 
         # Calculate Option Prices
         for i in range(N-1, 0-1, -1):
@@ -52,25 +53,27 @@ class Model:
                     tree[i][j] = option_price
                 else: # American
                     currentStockPrice = S*(u**j)*(d**(i-j))
-                    tree[i][j] = max(option_price, currentStockPrice-K) if type == OptionType.CALL else max(option_price, K-currentStockPrice)
+                    tree[i][j] = max(option_price, currentStockPrice-K) if otype == OptionType.CALL else max(option_price, K-currentStockPrice)
                 
         # Return the value of the root node
         return tree[0][0]
 
-    def _calc_opt_price_model2(self, type:OptionType, style:OptionStyle, quote_date,  S, K, tau, sigma, r=0.03,  N=10):
+    def _calc_opt_price_model2(self, otype:OptionType, style:OptionStyle, quote_date,  S, K, tau, sigma, r=0.03,  N=10, autoR=True):
+        # obtain rolling average of risk free rate
+        r = self.getRfRate(quote_date) if autoR else r
+
         # Intermediate variables
         dividend_dates = self._checkIfDividend(tau, quote_date)
-        additionalBias = 0.0
         deltaT = tau/N
         u = math.exp(sigma*math.sqrt(deltaT))
         d = 1/u
 
         # This handles 0 sigma or very small sigma
-        if u-d < 0.0001 or (math.exp((r+additionalBias)*deltaT)-d)/(u-d) > 1:
-            return math.exp((r+additionalBias)*tau) * (max(S-K, 0) if type==OptionType.CALL else max(K-S, 0))
+        if u-d < 0.0001 or (math.exp(r*deltaT)-d)/(u-d) > 1:
+            return math.exp(r*tau) * (max(S-K, 0) if otype==OptionType.CALL else max(K-S, 0))
 
         # Intermediate variables (cont'd)
-        p = (math.exp((r+additionalBias)*deltaT)-d)/(u-d)
+        p = (math.exp(r*deltaT)-d)/(u-d)
         discount = math.exp(-r*tau/N)
 
         trials:List[int] = []
@@ -90,7 +93,6 @@ class Model:
             trees.append(layer)
             current *= (trial+1)
 
-        pp = pprint.PrettyPrinter(indent=4)
         # Initialise first node of first layer of first tree with initial stock price
         trees[0][0][0][0] = S
         for layerIndex in range(len(trees)):
@@ -101,33 +103,25 @@ class Model:
         for tree in trees[-1]:
             for i in range(len(tree)):
                 node = tree[-1][i]
-                tree[-1][i] = max(0, node-K) if type == OptionType.CALL else max(0, K-node)
+                tree[-1][i] = max(0, node-K) if otype == OptionType.CALL else max(0, K-node)
 
         # Backprop option payoff
-        # print(f"len tree: {len(trees)}")
         for layerInd in range(len(trees)-1, -1, -1):
-            # print(f"li: {layerInd}")
             layer = trees[layerInd]
-            # self.backPropOptionPrices(optionType, tau/N, r, trees, ~i)
             for treeInd in range(len(layer)-1, -1, -1):
                 tree = layer[treeInd]
-                # print(f"ti: {treeInd}")
-                # pp.pprint(tree)
                 baseStockPrice = tree[0][0]
                 for i in range(len(tree)-2, -1, -1):
                     for j in range(i+1):
                         currentStockPrice = baseStockPrice*(u**j)*(d**(i-j))
-                        if type == OptionType.CALL:
-                            futurePayoff = discount * \
-                                (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
-                            payoff = max(futurePayoff, max(
-                                currentStockPrice-K, 0))
+                        if otype == OptionType.CALL:
+                            futurePayoff = discount * (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
+                            payoff = max(futurePayoff, max(currentStockPrice-K, 0))
                         else:
-                            futurePayoff = discount * \
-                                (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
-                            payoff = max(futurePayoff, max(
-                                K-currentStockPrice, 0))
+                            futurePayoff = discount * (p*tree[i+1][j+1]+(1-p)*tree[i+1][j])
+                            payoff = max(futurePayoff, max(K-currentStockPrice, 0))
                         tree[i][j] = payoff
+                
                 if layerInd != 0:
                     # put the payoff in the previous layer
                     prevLayer = trees[layerInd-1]
@@ -136,26 +130,6 @@ class Model:
                     pNodeIndex = treeInd % pTreeLen
 
                     trees[layerInd-1][pTreeIndex][-1][pNodeIndex] = layer[treeInd][0][0]
-                    # print(
-                    #     f"pTI: {pTreeIndex}, cTI: {treeInd}, nTI: {pNodeIndex}")
-                    # print("PIND", pTreeIndex)
-        # pp.pprint(trees)
-        # print(trees[0][0][0])
-        # pp.pprint(trees[0][-1])
-        # pp.pprint(trees[1][0][0])
-        # pp.pprint(trees[1][1][0])
-        # pr = []
-        # pt = []
-
-        # for i, layer in enumerate(trees):
-        #     if i == 1:
-        #         for j, tree in enumerate(layer):
-        #             for k in range(len(tree)):
-        #                 pr.append(round(tree[-1][k]))
-        #     if i == 2:
-        #         for j, tree in enumerate(layer):
-        #             pt.append(round(tree[0][0]))
-        # print(f"CHECK: {pr, pt}")
 
         return trees[0][0][0][0]
 

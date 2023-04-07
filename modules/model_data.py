@@ -72,27 +72,6 @@ class ModelData:
         res = self.getModelParamData(res)
         return res
 
-
-    # <><><> Unused Functions
-    # def getSpecificCurrentPrice(self, expDate: str, quoteDate: str, strikePrice: float):
-    #     exp = pd.to_datetime(expDate)
-    #     quote = pd.to_datetime(quoteDate)
-
-    #     current = self.data.loc[
-    #         (self.data["quote_date"] == quote) &
-    #         (self.data["expire_date"] == exp) &
-    #         (self.data["K"] == strikePrice)]
-    #     current = self.getModelParamData(current)
-
-    #     others = self.data.loc[(self.data["quote_date"] == quote)]
-    #     others = others.drop(others[
-    #         (others["quote_date"] == quoteDate) &
-    #         (others["expire_date"] == expDate) &
-    #         (others["K"] == strikePrice)].index)
-    #     others = self.getModelParamData(others)
-    #     # print(current, "\n", others)
-    #     return current, others
-
 if __name__ == "__main__":
     df = pd.read_csv("./trimmed.csv", low_memory=False)
     # date = dt.datetime(2021, 2, 20)
