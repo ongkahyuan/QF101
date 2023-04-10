@@ -253,17 +253,17 @@ if __name__ == '__main__':
     K = 50.0
     tau = 130/365
     # tau = 183/365
-    sigma = 80
+    sigma = 0.3
     r = 0.1
     q = 0.01
     mod = Model()
     # print('European Value: {0}, American Option Value: {1}'.format(
     # *mod.model('call', S, K, tau, sigma)))
     # mod._checkIfDividend(tau, dt.datetime(year=2022, month=7, day=29))
-    v1 = mod.model('call', S, K, tau, sigma)
-    v2 = mod.modelv2('call', dt.datetime(
-        year=2022, month=7, day=29), S, K, tau, sigma)
-    print(v1, v2)
+    # v1 = mod.calculate_option_price('call', S, K, tau, sigma)
+    v2 = mod.calculate_option_price(OptionType.CALL, OptionStyle.AMERICAN, S, K, tau, sigma, r=0.03, q=0.0, N=40, quote_date = dt.datetime(
+        year=2022, month=7, day=29))
+    print( v2)
     # price = mod._estDivPrice(dt.datetime(year=2020, month=11, day=5))
     # print(price)
     print(mod.getRfRate(dt.datetime(2022, 7, 1)))
